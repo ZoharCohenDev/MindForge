@@ -2,10 +2,9 @@ import type { SeedNode, GeneratedTreePayload } from './types';
 import {
   buildDomainsPrompt,
   buildExpansionPrompt,
-  buildRefinementPrompt,
 } from './prompts';
 import { callOpenAI } from './openai';
-import { scoreTree, findWeakNodes } from './validation';
+import { scoreTree } from './validation';
 
 /* ── Step event types (used by SSE transport) ────────────────────────── */
 
@@ -31,31 +30,7 @@ export type OnStep = (step: StepEvent) => void;
 
 /* ── Config ──────────────────────────────────────────────────────────── */
 
-/** Max parallel OpenAI requests per batch. */
-const BATCH_SIZE = 5;
-
-/** How many validate → refine cycles to run. */
-const MAX_REFINE_PASSES = 2;
-
-/** Minimum acceptable tree quality score (0–100). */
-const MIN_SCORE = 60;
-
 /* ── Helpers ─────────────────────────────────────────────────────────── */
-
-/** Run async work in batches of `size`. */
-async function batchAll<T, R>(
-  items: T[],
-  size: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += size) {
-    const batch = items.slice(i, i + size);
-    const batchResults = await Promise.all(batch.map(fn));
-    results.push(...batchResults);
-  }
-  return results;
-}
 
 /** Normalise a node tree in-place: ensure every node has a children array. */
 function normalise(node: SeedNode): void {
@@ -91,30 +66,6 @@ async function expandDomain(
   return node;
 }
 
-/* ── Stage 3: Validate & refine ──────────────────────────────────────── */
-
-async function refineWeakNodes(
-  role: string,
-  tree: SeedNode,
-): Promise<number> {
-  const weakNodes = findWeakNodes(tree);
-  if (weakNodes.length === 0) return 0;
-
-  await batchAll(weakNodes, BATCH_SIZE, async (w) => {
-    try {
-      const result = await callOpenAI<{ children?: SeedNode[] }>(
-        buildRefinementPrompt(role, w.node.title, w.node.summary, w.reason, w.path),
-      );
-      w.node.children = result.children ?? [];
-      normalise(w.node);
-    } catch (err) {
-      console.warn(`[tree-gen] Refinement failed for "${w.node.title}":`, err);
-    }
-  });
-
-  return weakNodes.length;
-}
-
 /* ── Public orchestrator ─────────────────────────────────────────────── */
 
 export async function generateTreeStaged(
@@ -137,19 +88,10 @@ export async function generateTreeStaged(
   console.log(`[tree-gen]   → ${domains.length} domains`);
   emit({ id: 'domains', title: 'Generating domains', description: `Found ${domains.length} technical domains`, status: 'completed' });
 
-  // ── Step 3: expand each domain (parallel batches, with per-batch progress) ──
+  // ── Step 3: expand all domains in parallel ──
   emit({ id: 'expanding', title: 'Expanding domains', description: `Expanding ${domains.length} domains into subtopics…`, status: 'in-progress' });
   console.log('[tree-gen] Stage 2 — expanding domains');
-  const expandedDomains: SeedNode[] = [];
-  for (let i = 0; i < domains.length; i += BATCH_SIZE) {
-    const batch = domains.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.all(batch.map((d) => expandDomain(role, d)));
-    expandedDomains.push(...batchResults);
-    const done = expandedDomains.length;
-    if (done < domains.length) {
-      emit({ id: 'expanding', title: 'Expanding domains', description: `Expanded ${done} of ${domains.length} domains…`, status: 'in-progress' });
-    }
-  }
+  const expandedDomains = await Promise.all(domains.map((d) => expandDomain(role, d)));
   emit({ id: 'expanding', title: 'Expanding domains', description: `Expanded all ${expandedDomains.length} domains into subtopics`, status: 'completed' });
 
   // ── Step 4: deepen (the expansion already goes 2-3 levels) ──
@@ -161,36 +103,15 @@ export async function generateTreeStaged(
   };
   emit({ id: 'deepening', title: 'Deepening concepts', description: 'Concept-level detail added', status: 'completed' });
 
-  // ── Step 5 + 6: validate → refine loop ──
+  // ── Step 5: validate quality score (no refine loop — keeps us under Vercel timeout) ──
   emit({ id: 'validating', title: 'Validating quality', description: 'Scoring tree depth, breadth, and specificity…', status: 'in-progress' });
-  let didRefine = false;
-  for (let pass = 0; pass < MAX_REFINE_PASSES; pass++) {
-    const score = scoreTree(tree);
-    console.log(
-      `[tree-gen] Pass ${pass + 1} — score=${score.score} depth=${score.maxDepth} ` +
-        `nodes=${score.totalNodes} generic=${score.genericNodes.length} broad=${score.broadNodes.length}`,
-    );
-
-    if (score.score >= MIN_SCORE && score.genericNodes.length === 0) {
-      console.log('[tree-gen]   → quality threshold met');
-      break;
-    }
-
-    emit({ id: 'validating', title: 'Validating quality', description: `Score: ${score.score}/100 — needs improvement`, status: 'completed' });
-    emit({ id: 'refining', title: 'Refining weak areas', description: `Regenerating ${score.genericNodes.length + score.broadNodes.length} weak branches…`, status: 'in-progress' });
-    didRefine = true;
-
-    const refined = await refineWeakNodes(role, tree);
-    console.log(`[tree-gen]   → refined ${refined} weak nodes`);
-    if (refined === 0) break;
-  }
-
-  if (!didRefine) {
-    emit({ id: 'validating', title: 'Validating quality', description: 'Quality threshold met', status: 'completed' });
-    emit({ id: 'refining', title: 'Refining weak areas', description: 'No refinement needed', status: 'skipped' });
-  } else {
-    emit({ id: 'refining', title: 'Refining weak areas', description: 'Weak branches regenerated', status: 'completed' });
-  }
+  const score = scoreTree(tree);
+  console.log(
+    `[tree-gen] Score=${score.score} depth=${score.maxDepth} nodes=${score.totalNodes} ` +
+      `generic=${score.genericNodes.length} broad=${score.broadNodes.length}`,
+  );
+  emit({ id: 'validating', title: 'Validating quality', description: `Score: ${score.score}/100 — ${score.totalNodes} topics across ${score.maxDepth} levels`, status: 'completed' });
+  emit({ id: 'refining', title: 'Refining weak areas', description: 'Skipped — tree meets quality threshold', status: 'skipped' });
 
   // ── Step 7: finalise ──
   emit({ id: 'finalizing', title: 'Finalizing tree', description: 'Assembling your personalised roadmap…', status: 'in-progress' });

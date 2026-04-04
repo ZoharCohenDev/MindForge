@@ -14,7 +14,7 @@ export function buildDomainsPrompt(role: string): string {
 RULES:
 - Each domain must be a SPECIFIC, NAMED technical area (e.g. "JavaScript", "SQL", "Docker", "Linear Algebra").
 - Do NOT use generic groupings: Foundations, Core Concepts, Basics, Advanced Topics, Career Growth, Overview, Introduction, Best Practices, Hands-on Practice, Core Skills.
-- Include 12–25 domains depending on role breadth.
+- Include 8–12 domains depending on role breadth.
 - Order roughly from foundational knowledge → specialised / production topics.
 
 Return JSON:
