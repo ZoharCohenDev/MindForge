@@ -3357,45 +3357,11 @@ code {
     height: 12px;
   }
 
-  /* ── Actions: default hidden, reveal on tap (focus-within) ── */
-  /* Override desktop :hover trigger — don't show on sticky tap-hover */
-  .tr-row:hover .tr-actions {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  /* Only reveal when a button inside the row is actively focused (tapped) */
+  /* ── Actions: completely hidden on mobile — topic only ── */
+  .tr-actions,
+  .tr-row:hover .tr-actions,
   .tr-row:focus-within .tr-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .tr-actions {
-    /* Push to its own line */
-    order: 10;
-    flex-basis: 100%;
-    /* Indent to align with where the title starts */
-    padding-left: 34px;
-    gap: 5px;
-    margin-top: 2px;
-    transition: opacity 0.15s ease;
-  }
-
-  /* Hide text labels — icon-only on mobile */
-  .tr-action-labeled span { display: none !important; }
-
-  .tr-action-labeled {
-    width: 30px;
-    height: 28px;
-    padding: 0;
-    justify-content: center;
-    border-radius: 7px;
-  }
-
-  .tr-action {
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
+    display: none !important;
   }
 
   /* ── Toolbar / page header ── */
@@ -3454,22 +3420,12 @@ code {
 
 }
 
-/* Touch devices: also apply to any wide-but-touch screen */
+/* Touch devices: also completely hide action buttons */
 @media (hover: none) and (pointer: coarse) {
-  .tr-row:hover .tr-actions {
-    opacity: 0;
-    pointer-events: none;
-  }
+  .tr-actions,
+  .tr-row:hover .tr-actions,
   .tr-row:focus-within .tr-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .tr-action-labeled span { display: none !important; }
-  .tr-action-labeled {
-    width: 30px;
-    height: 28px;
-    padding: 0;
-    justify-content: center;
+    display: none !important;
   }
 }
 
@@ -3482,6 +3438,23 @@ code {
 .gp-canvas {
   min-height: 620px;
   height: calc(100dvh - 160px);
+}
+
+/* Graph page: take full height, no scroll */
+.graph-page-stack {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 12px;
+}
+.page-content:has(.graph-page-stack) {
+  overflow: hidden;
+}
+.graph-page-stack .gp-canvas {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
 }
 
 .gp-side-panel {
@@ -3575,3 +3548,54 @@ code {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GRAPH PAGE — mobile node-detail modal
+   Full-screen overlay when a node is tapped on mobile
+   ═══════════════════════════════════════════════════════════════════════════ */
+.gp-mobile-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(4, 6, 18, 0.98);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+
+.gp-mobile-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.gp-mobile-modal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 7px 13px;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.gp-mobile-modal-back:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.gp-mobile-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 32px;
+}

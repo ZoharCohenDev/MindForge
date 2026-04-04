@@ -1,8 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, ChevronDown, ChevronRight, Code2, Network, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Code2, Network, Play, X } from 'lucide-react';
 import { listTopicNotes, listTopics } from '../lib/dataApi';
 import type { Note, Topic, TreeType } from '../types';
+
+// ── Pyodide (client-side Python) — loaded once, shared across notes ──────────
+declare global { interface Window { loadPyodide: (cfg: { indexURL: string }) => Promise<any>; } }
+let _pyodideInstance: any = null;
+let _pyodideLoading: Promise<any> | null = null;
+async function getPyodide(): Promise<any> {
+  if (_pyodideInstance) return _pyodideInstance;
+  if (_pyodideLoading) return _pyodideLoading;
+  _pyodideLoading = (async () => {
+    if (!window.loadPyodide) {
+      await new Promise<void>((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed to load Pyodide'));
+        document.head.appendChild(s);
+      });
+    }
+    const py = await window.loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/' });
+    _pyodideInstance = py;
+    return py;
+  })();
+  return _pyodideLoading;
+}
+const RUNNABLE_LANGS = new Set(['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','Bash']);
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -199,7 +224,65 @@ function buildLayout(topics: Topic[]) {
 
 function NoteCard({ note, accentColor }: { note: Note; accentColor: string }) {
   const [open, setOpen] = useState(true);
+  const [runningIdx, setRunningIdx] = useState<number | null>(null);
+  const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
   const hasExtra = !!(note.code_example || (note.code_blocks?.length ?? 0) > 0);
+
+  const handleRunCode = async (code: string, language: string, idx: number) => {
+    if (!code.trim() || !RUNNABLE_LANGS.has(language)) return;
+    setRunningIdx(idx);
+    setBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; });
+
+    if (language === 'Python') {
+      try {
+        const py = await getPyodide();
+        let stdout = ''; let stderr = '';
+        py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
+        py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
+        await py.runPythonAsync(`
+_plot_images = []
+try:
+    import matplotlib as _mpl
+    _mpl.use('Agg')
+    import matplotlib.pyplot as _plt
+    import io as _io, base64 as _b64
+    def _show_capture(*a, **kw):
+        buf = _io.BytesIO()
+        _plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+        buf.seek(0)
+        _plot_images.append(_b64.b64encode(buf.read()).decode())
+        _plt.close('all')
+    _plt.show = _show_capture
+except ImportError:
+    pass
+        `);
+        await py.loadPackagesFromImports(code);
+        let exitCode = 0;
+        try { await py.runPythonAsync(code); } catch (e: unknown) { stderr = String(e); exitCode = 1; }
+        const rawImages = py.runPython('_plot_images');
+        const plotImages: string[] = rawImages?.toJs?.() ?? [];
+        setBlockOutputs(prev => ({ ...prev, [idx]: { stdout: stdout.trimEnd(), stderr: stderr.trimEnd(), exitCode, plotImages } }));
+      } catch (err: unknown) {
+        setBlockOutputs(prev => ({ ...prev, [idx]: { stdout: '', stderr: String(err instanceof Error ? err.message : err), exitCode: 1 } }));
+      } finally { setRunningIdx(null); }
+      return;
+    }
+
+    try {
+      const resp = await fetch('/api/run-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language, code }),
+      });
+      const data = await resp.json() as any;
+      if (!resp.ok) throw new Error(data?.error ?? `Execution failed (${resp.status})`);
+      const typed = data as { run: { stdout: string; stderr: string; code: number } };
+      setBlockOutputs(prev => ({ ...prev, [idx]: { stdout: typed.run.stdout ?? '', stderr: typed.run.stderr ?? '', exitCode: typed.run.code ?? 0 } }));
+    } catch (err: unknown) {
+      setBlockOutputs(prev => ({ ...prev, [idx]: { stdout: '', stderr: String(err instanceof Error ? err.message : err), exitCode: 1 } }));
+    } finally { setRunningIdx(null); }
+  };
+
   return (
     <div style={{
       marginBottom: '8px',
@@ -259,9 +342,20 @@ function NoteCard({ note, accentColor }: { note: Note; accentColor: string }) {
           {/* Multi-language code blocks */}
           {(note.code_blocks?.length ?? 0) > 0 && note.code_blocks!.map((block, idx) => (
             <div key={idx} style={{ marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', flexWrap: 'wrap' }}>
                 <Code2 size={10} color="#818cf8" />
-                <span style={{ fontSize: '0.67rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{block.language}</span>
+                <span style={{ fontSize: '0.67rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.06em', flex: 1 }}>{block.language}</span>
+                {RUNNABLE_LANGS.has(block.language) && (
+                  <button
+                    type="button"
+                    className="cb-run-btn"
+                    onClick={() => void handleRunCode(block.code, block.language, idx)}
+                    disabled={runningIdx === idx || !block.code.trim()}
+                  >
+                    <Play size={10} />
+                    {runningIdx === idx ? 'Running…' : 'Run'}
+                  </button>
+                )}
               </div>
               <pre style={{
                 margin: 0, padding: '9px 11px',
@@ -272,6 +366,24 @@ function NoteCard({ note, accentColor }: { note: Note; accentColor: string }) {
                 whiteSpace: 'pre', fontFamily: 'ui-monospace, Menlo, monospace',
                 border: '1px solid rgba(129,140,248,0.2)',
               }}><code>{block.code}</code></pre>
+              {blockOutputs[idx] !== undefined && (
+                <div className="cb-output">
+                  <div className="cb-output-header">
+                    <span className={`cb-output-status ${blockOutputs[idx].exitCode === 0 ? 'cb-output-status--ok' : 'cb-output-status--err'}`}>
+                      {blockOutputs[idx].exitCode === 0 ? '✓ exit 0' : `✗ exit ${blockOutputs[idx].exitCode}`}
+                    </span>
+                    <button type="button" className="cb-output-clear" onClick={() => setBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; })} title="Clear">
+                      <X size={11} />
+                    </button>
+                  </div>
+                  <pre className="cb-output-pre">
+                    {(blockOutputs[idx].stdout + (blockOutputs[idx].stdout && blockOutputs[idx].stderr ? '\n' : '') + blockOutputs[idx].stderr).trimEnd() || '(no output)'}
+                  </pre>
+                  {blockOutputs[idx].plotImages?.map((img, i) => (
+                    <img key={i} src={`data:image/png;base64,${img}`} alt={`plot ${i + 1}`} style={{ maxWidth: '100%', marginTop: '8px', borderRadius: '4px', display: 'block' }} />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -315,6 +427,7 @@ export function GraphPage() {
   const [hovered,      setHovered]      = useState<LNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<LNode | null>(null);
   const [view,         setView]         = useState({ x: 0, y: 0, scale: 1 });
+  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth <= 768);
   const [searchParams] = useSearchParams();
 
   const dragging    = useRef(false);
@@ -333,6 +446,13 @@ export function GraphPage() {
       .then(([t, n]) => { setTopics(t); setNotes(n); })
       .catch(console.error);
   }, [activeTree]);
+
+  // Track mobile breakpoint
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Non-passive wheel listener for zoom — re-runs once the canvas mounts (doneCount > 0)
   useEffect(() => {
@@ -482,7 +602,7 @@ export function GraphPage() {
   const ty = view.y + CY * (1 - view.scale);
 
   return (
-    <div className="page-stack" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div className="graph-page-stack">
 
       {/* Header */}
       <div className="tr-page-bar">
@@ -779,8 +899,8 @@ export function GraphPage() {
             </g>
           </svg>
 
-          {/* ── Note side panel ── */}
-          {selectedNode && (
+          {/* ── Desktop side panel (right rail) ── */}
+          {selectedNode && !isMobile && (
             <div
               onClick={e => e.stopPropagation()}
               className="gp-side-panel"
@@ -895,6 +1015,88 @@ export function GraphPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Mobile full-screen node modal ── */}
+      {selectedNode && isMobile && (
+        <div className="gp-mobile-modal" onClick={e => e.stopPropagation()}>
+          {/* Header with back button */}
+          <div className="gp-mobile-modal-header" style={{ borderBottom: `1px solid ${selectedNode.color}30` }}>
+            <button className="gp-mobile-modal-back" onClick={() => setSelectedNode(null)}>
+              <ArrowLeft size={15} />
+              Back to graph
+            </button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedNode.topic.title}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                <span style={{
+                  fontSize: '0.65rem', fontWeight: 600,
+                  color: selectedNode.isDone ? '#34d399' : 'rgba(255,255,255,0.3)',
+                  background: selectedNode.isDone ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${selectedNode.isDone ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: '4px', padding: '1px 7px',
+                }}>
+                  {selectedNode.isDone ? '✓ mastered' : '○ pathway'}
+                </span>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: selectedNode.color, boxShadow: `0 0 6px ${selectedNode.color}` }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="gp-mobile-modal-body">
+            {(notesByTopic[selectedNode.topic.id] ?? []).length > 0 ? (
+              <TopicNoteGroup
+                title={selectedNode.topic.title}
+                color={selectedNode.color}
+                notes={notesByTopic[selectedNode.topic.id] ?? []}
+                defaultOpen
+              />
+            ) : (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '12px 14px', marginBottom: '16px',
+                background: 'rgba(255,255,255,0.025)',
+                borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <BookOpen size={13} color="rgba(255,255,255,0.2)" />
+                <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>
+                  No notes for this topic yet.
+                </span>
+              </div>
+            )}
+            {selectedNode.children.length > 0 &&
+              selectedNode.children.some(c => (notesByTopic[c.topic.id] ?? []).length > 0) && (
+              <>
+                <div style={{
+                  fontSize: '0.67rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.22)',
+                  textTransform: 'uppercase', letterSpacing: '0.08em',
+                  marginBottom: '12px', marginTop: '4px',
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                }}>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+                  Children notes
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+                </div>
+                {selectedNode.children
+                  .filter(c => (notesByTopic[c.topic.id] ?? []).length > 0)
+                  .map(child => (
+                    <TopicNoteGroup
+                      key={child.topic.id}
+                      title={child.topic.title}
+                      color={child.color}
+                      notes={notesByTopic[child.topic.id] ?? []}
+                      defaultOpen={false}
+                    />
+                  ))
+                }
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
