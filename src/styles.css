@@ -3033,9 +3033,9 @@ code {
 .tr-modal-header  { flex-shrink: 0; }
 .tr-modal-actions { flex-shrink: 0; }
 
-/* Form modal (explanation / edit-note) — starts at 650px, grows with content */
+/* Form modal (explanation / edit-note) — starts at 600px, grows with content */
 .tr-modal--form {
-  min-height: min(650px, calc(100dvh - 3rem));
+  min-height: min(600px, calc(100dvh - 3rem));
   max-height: calc(100dvh - 3rem);
 }
 
@@ -3047,16 +3047,16 @@ code {
 /* Dialog modal (add subject / add concept) — fixed 350px */
 .tr-modal--dialog {
   width: min(520px, 96vw);
-  height: min(350px, calc(100dvh - 3rem));
+  height: min(280px, calc(100dvh - 3rem));
   min-height: unset;
-  max-height: min(350px, calc(100dvh - 3rem));
+  max-height: min(280px, calc(100dvh - 3rem));
 }
 
-/* Project modal — fixed 800px */
+/* Project modal — fixed 1000px */
 .tr-modal--project {
-  height: min(800px, calc(100dvh - 3rem));
+  height: min(1000px, calc(100dvh - 3rem));
   min-height: unset;
-  max-height: min(800px, calc(100dvh - 3rem));
+  max-height: min(1000px, calc(100dvh - 3rem));
 }
 
 /* Danger icon variant */
