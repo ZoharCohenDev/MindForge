@@ -3311,3 +3311,165 @@ code {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AI TREE — MOBILE REDESIGN
+   On small screens: label-only rows, actions collapse to icon-row on tap
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ── Shell / container ── */
+  .tr-shell {
+    border-radius: 14px;
+    padding: 0.6rem 0.5rem;
+  }
+
+  /* ── Each tree row wraps so actions can go below the title ── */
+  .tr-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    min-height: auto;
+    padding: 5px 4px 4px 2px;
+    gap: 3px;
+  }
+
+  /* Narrow indent guides to reclaim horizontal space */
+  .tr-guide { width: 14px; }
+
+  /* Chevron and check stay shrunk */
+  .tr-chevron { width: 18px; height: 18px; }
+  .tr-check   { width: 15px; height: 15px; }
+
+  /* Title gets full flex width on its "line"; allow it to breathe */
+  .tr-title {
+    font-size: 0.86rem;
+    line-height: 1.35;
+    /* Allow multi-line on mobile — more readable than truncation */
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  /* Progress pill — keep but smaller */
+  .tr-progress {
+    width: 40px;
+    height: 12px;
+  }
+
+  /* ── Actions: default hidden, reveal on tap (focus-within) ── */
+  /* Override desktop :hover trigger — don't show on sticky tap-hover */
+  .tr-row:hover .tr-actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Only reveal when a button inside the row is actively focused (tapped) */
+  .tr-row:focus-within .tr-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .tr-actions {
+    /* Push to its own line */
+    order: 10;
+    flex-basis: 100%;
+    /* Indent to align with where the title starts */
+    padding-left: 34px;
+    gap: 5px;
+    margin-top: 2px;
+    transition: opacity 0.15s ease;
+  }
+
+  /* Hide text labels — icon-only on mobile */
+  .tr-action-labeled span { display: none !important; }
+
+  .tr-action-labeled {
+    width: 30px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 7px;
+  }
+
+  .tr-action {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  /* ── Toolbar / page header ── */
+  .tr-page-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .tr-page-bar-right {
+    flex-wrap: wrap;
+    gap: 6px !important;
+  }
+
+  .tr-cmd-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .tr-cmd-bar input {
+    width: 100%;
+  }
+
+  /* Add subject/concept/node buttons — wrap and stretch */
+  .tr-cmd-right {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tr-cmd-right button,
+  .tr-cmd-bar button {
+    flex: 1 1 auto;
+    min-width: 100px;
+    justify-content: center;
+  }
+
+  /* Progress summary row */
+  .tr-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .tr-overall-bar { max-width: 100%; }
+
+  /* Minimal AI tree toolbar */
+  .tree-minimal-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border-radius: 12px;
+    padding: 0.75rem;
+  }
+
+}
+
+/* Touch devices: also apply to any wide-but-touch screen */
+@media (hover: none) and (pointer: coarse) {
+  .tr-row:hover .tr-actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .tr-row:focus-within .tr-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .tr-action-labeled span { display: none !important; }
+  .tr-action-labeled {
+    width: 30px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
