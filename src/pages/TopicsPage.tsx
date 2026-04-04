@@ -392,23 +392,14 @@ export function TopicsPage() {
 
   const CONVERT_LANGS = ['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','SQL','Bash'];
 
-  const PISTON_LANG_MAP: Record<string, { language: string; version: string }> = {
-    'Python':     { language: 'python',     version: '3.10.0' },
-    'JavaScript': { language: 'javascript', version: '18.15.0' },
-    'TypeScript': { language: 'typescript', version: '5.0.3' },
-    'Java':       { language: 'java',       version: '15.0.2' },
-    'C++':        { language: 'c++',        version: '10.2.0' },
-    'C#':         { language: 'csharp',     version: '6.12.0' },
-    'Go':         { language: 'go',         version: '1.16.2' },
-    'Rust':       { language: 'rust',       version: '1.50.0' },
-    'Bash':       { language: 'bash',       version: '5.1.0' },
-  };
+  const PISTON_LANG_MAP = new Set([
+    'Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','Bash',
+  ]);
 
   const handleRunCode = async (idx: number) => {
     const block = codeBlocks[idx];
     if (!block?.code.trim()) return;
-    const lang = PISTON_LANG_MAP[block.language];
-    if (!lang) return;
+    if (!PISTON_LANG_MAP.has(block.language)) return;
     setRunningIdx(idx);
     setBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; });
     try {
@@ -416,8 +407,7 @@ export function TopicsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language: lang.language,
-          version: lang.version,
+          language: block.language,
           code: block.code,
         }),
       });
@@ -983,7 +973,7 @@ export function TopicsPage() {
                             </div>
                           )}
                           {/* Run button — only for executable languages */}
-                          {PISTON_LANG_MAP[block.language] && (
+                          {PISTON_LANG_MAP.has(block.language) && (
                             <button
                               type="button"
                               className="cb-run-btn"
