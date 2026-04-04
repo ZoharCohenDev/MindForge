@@ -1,4 +1,4 @@
-import type { SeedNode } from './types';
+import type { SeedNode } from './types.js';
 
 /* ── Forbidden generic titles ────────────────────────────────────────── */
 

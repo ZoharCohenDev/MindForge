@@ -12,12 +12,10 @@
  * When OPENAI_API_KEY is absent, returns a structured mock for local dev.
  */
 
-export type { SeedNode, GeneratedTreePayload } from './lib/types';
-export type { StepEvent } from './lib/treeGenerator';
+export type { SeedNode, GeneratedTreePayload } from './lib/types.js';
 
-import type { GeneratedTreePayload } from './lib/types';
-import { generateTreeStaged } from './lib/treeGenerator';
-import type { StepEvent } from './lib/treeGenerator';
+import type { GeneratedTreePayload } from './lib/types.js';
+import { generateTreeStaged } from './lib/treeGenerator.js';
 
 /** @deprecated — kept for backward compat; generation now uses staged prompts. */
 export function buildTreePrompt(careerGoal: string): string {
@@ -865,7 +863,7 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let body: { careerGoal?: string; stream?: boolean };
+  let body: { careerGoal?: string };
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
   } catch {
@@ -882,45 +880,6 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json(getMockTree(careerGoal));
   }
 
-  const wantStream = body.stream === true;
-
-  // ── SSE streaming mode ──
-  if (wantStream) {
-    // Access raw ServerResponse when available (Vite local plugin or Vercel Edge/Node adapter)
-    const raw = res._raw ?? res;
-    // Disable Nagle so every chunk is sent immediately (critical for SSE)
-    if (raw.socket) raw.socket.setNoDelay(true);
-    raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    // Flush headers NOW so the client starts receiving the SSE stream right away
-    raw.flushHeaders();
-
-    const send = (event: string, data: unknown) => {
-      raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      // Drain the socket buffer after every event
-      if (typeof raw.flush === 'function') raw.flush();
-    };
-
-    try {
-      const result = await generateTreeStaged(careerGoal, (step: StepEvent) => {
-        send('step', step);
-      });
-      send('result', result);
-      send('done', {});
-      raw.end();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'AI tree generation failed';
-      console.error('[generate-tree]', message);
-      send('error', { error: message });
-      raw.end();
-    }
-    return;
-  }
-
-  // ── Classic JSON mode (fallback) ──
   try {
     const result = await generateTreeStaged(careerGoal);
     return res.status(200).json(result);

@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT } from './prompts';
+import { SYSTEM_PROMPT } from './prompts.js';
 
 /**
  * Call OpenAI chat completions with JSON mode.

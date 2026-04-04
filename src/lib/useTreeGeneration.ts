@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { SeedNode } from '../types';
 
-/* ── Types mirroring the backend StepEvent ─────────────────────────── */
+/* ── Types ───────────────────────────────────────────────────────────── */
 
 export type StepId =
   | 'understanding'
@@ -31,13 +31,26 @@ export interface GeneratedPayload {
 /* ── Initial step list ──────────────────────────────────────────────── */
 
 const INITIAL_STEPS: StepState[] = [
-  { id: 'understanding', title: 'Understanding the role', description: 'Analysing what the role requires…', status: 'pending' },
-  { id: 'domains', title: 'Generating domains', description: 'Identifying core knowledge areas…', status: 'pending' },
-  { id: 'expanding', title: 'Expanding domains', description: 'Breaking domains into subtopics…', status: 'pending' },
-  { id: 'deepening', title: 'Deepening concepts', description: 'Adding concept-level detail…', status: 'pending' },
-  { id: 'validating', title: 'Validating quality', description: 'Scoring tree quality…', status: 'pending' },
-  { id: 'refining', title: 'Refining weak areas', description: 'Improving low-quality branches…', status: 'pending' },
-  { id: 'finalizing', title: 'Finalizing tree', description: 'Assembling your roadmap…', status: 'pending' },
+  { id: 'understanding', title: 'Understanding the role',  description: 'Analysing what the role requires…',         status: 'pending' },
+  { id: 'domains',       title: 'Generating domains',      description: 'Identifying core knowledge areas…',         status: 'pending' },
+  { id: 'expanding',     title: 'Expanding domains',       description: 'Breaking domains into subtopics…',          status: 'pending' },
+  { id: 'deepening',     title: 'Deepening concepts',      description: 'Adding concept-level detail…',              status: 'pending' },
+  { id: 'validating',    title: 'Validating quality',      description: 'Scoring tree quality…',                     status: 'pending' },
+  { id: 'refining',      title: 'Refining weak areas',     description: 'Improving low-quality branches…',           status: 'pending' },
+  { id: 'finalizing',    title: 'Finalizing tree',         description: 'Assembling your roadmap…',                  status: 'pending' },
+];
+
+/* ── Step animation schedule (ms from request start) ───────────────── */
+// Calibrated to a typical 12–20 s generation time.
+// If the fetch resolves early, remaining steps fast-forward instantly.
+const SCHEDULE: { id: StepId; activeAt: number; completeAt: number | 'fetch' }[] = [
+  { id: 'understanding', activeAt: 0,     completeAt: 900   },
+  { id: 'domains',       activeAt: 1000,  completeAt: 5000  },
+  { id: 'expanding',     activeAt: 5100,  completeAt: 16000 },
+  { id: 'deepening',     activeAt: 16100, completeAt: 17500 },
+  { id: 'validating',    activeAt: 17600, completeAt: 19000 },
+  { id: 'refining',      activeAt: 19000, completeAt: 19000 }, // always skipped
+  { id: 'finalizing',    activeAt: 19100, completeAt: 'fetch' },
 ];
 
 /* ── Hook ────────────────────────────────────────────────────────────── */
@@ -49,111 +62,99 @@ export function useTreeGeneration() {
   const [steps, setSteps] = useState<StepState[]>(INITIAL_STEPS);
   const [result, setResult] = useState<GeneratedPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef  = useRef<AbortController | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearTimers = useCallback(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  }, []);
 
   const updateStep = useCallback((id: StepId, patch: Partial<StepState>) => {
-    setSteps(prev =>
-      prev.map(s => (s.id === id ? { ...s, ...patch } : s)),
-    );
+    setSteps(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
   }, []);
 
   const generate = useCallback(async (careerGoal: string) => {
-    // Reset state
     setPhase('generating');
     setSteps(INITIAL_STEPS.map(s => ({ ...s })));
     setResult(null);
     setError(null);
+    clearTimers();
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    // ── Start the fetch immediately ──
+    const fetchPromise = fetch('/api/generate-tree', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ careerGoal }),
+      signal: ctrl.signal,
+    });
+
+    // ── Kick off the animated step schedule ──
+    const after = (ms: number, fn: () => void) => {
+      const id = setTimeout(fn, ms);
+      timersRef.current.push(id);
+    };
+
+    for (const s of SCHEDULE) {
+      if (s.id === 'refining') {
+        // refining is always skipped
+        after(s.activeAt, () => updateStep('refining', { status: 'skipped' }));
+        continue;
+      }
+      after(s.activeAt, () => updateStep(s.id, { status: 'in-progress' }));
+      if (typeof s.completeAt === 'number') {
+        after(s.completeAt, () => updateStep(s.id, { status: 'completed' }));
+      }
+      // completeAt === 'fetch' means we wait for the response (finalizing)
+    }
+
     try {
-      const resp = await fetch('/api/generate-tree', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ careerGoal, stream: true }),
-        signal: ctrl.signal,
-      });
+      const resp = await fetchPromise;
+      clearTimers();
 
-      // If the backend doesn't support SSE (e.g. mock mode), fall back to JSON
-      const ct = resp.headers.get('content-type') ?? '';
-      if (ct.includes('application/json')) {
-        if (!resp.ok) {
-          const err = (await resp.json()) as { error?: string };
-          throw new Error(err.error ?? `Generation failed (${resp.status})`);
-        }
-        const data = (await resp.json()) as GeneratedPayload;
-        // Instantly mark all steps completed for mock mode
-        setSteps(prev => prev.map(s => ({ ...s, status: 'completed' as StepStatus })));
-        setResult(data);
-        setPhase('done');
-        return data;
+      if (!resp.ok) {
+        const ct = resp.headers.get('content-type') ?? '';
+        const msg = ct.includes('application/json')
+          ? ((await resp.json()) as { error?: string }).error ?? `Generation failed (${resp.status})`
+          : `Generation failed (${resp.status})`;
+        throw new Error(msg);
       }
 
-      // ── SSE parsing ──
-      if (!resp.body) throw new Error('No response body for SSE');
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let eventType = '';   // persists across TCP chunks — an SSE event can span multiple reads
-      let payload: GeneratedPayload | null = null;
+      const data = (await resp.json()) as GeneratedPayload;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete SSE messages
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? ''; // keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            eventType = line.slice(7).trim();
-          } else if (line.startsWith('data: ')) {
-            const raw = line.slice(6);
-            try {
-              const data = JSON.parse(raw);
-              if (eventType === 'step') {
-                const s = data as StepState;
-                updateStep(s.id, { title: s.title, description: s.description, status: s.status });
-              } else if (eventType === 'result') {
-                payload = data as GeneratedPayload;
-              } else if (eventType === 'error') {
-                throw new Error((data as { error?: string }).error ?? 'Generation failed');
-              }
-            } catch (e) {
-              if (e instanceof SyntaxError) {
-                // Partial JSON line — will be reassembled via buffer across reads
-              } else {
-                throw e;
-              }
-            }
-            eventType = '';
-          }
-        }
-      }
-
-      if (!payload) throw new Error('Stream ended without a result');
-      setResult(payload);
+      // Fast-forward: complete any still-pending/in-progress steps, keep skipped
+      setSteps(prev =>
+        prev.map(s =>
+          s.status === 'pending' || s.status === 'in-progress'
+            ? { ...s, status: s.id === 'refining' ? 'skipped' : 'completed' }
+            : s,
+        ),
+      );
+      setResult(data);
       setPhase('done');
-      return payload;
+      return data;
     } catch (err: unknown) {
+      clearTimers();
       if ((err as Error).name === 'AbortError') return null;
       const msg = err instanceof Error ? err.message : 'Generation failed';
       setError(msg);
       setPhase('error');
       throw err;
     }
-  }, [updateStep]);
+  }, [updateStep, clearTimers]);
 
   const reset = useCallback(() => {
+    clearTimers();
     abortRef.current?.abort();
     setPhase('idle');
     setSteps(INITIAL_STEPS.map(s => ({ ...s })));
     setResult(null);
     setError(null);
-  }, []);
+  }, [clearTimers]);
 
   return { phase, steps, result, error, generate, reset };
 }
+

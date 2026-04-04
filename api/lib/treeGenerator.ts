@@ -1,10 +1,10 @@
-import type { SeedNode, GeneratedTreePayload } from './types';
+import type { SeedNode, GeneratedTreePayload } from './types.js';
 import {
   buildDomainsPrompt,
   buildExpansionPrompt,
-} from './prompts';
-import { callOpenAI } from './openai';
-import { scoreTree } from './validation';
+} from './prompts.js';
+import { callOpenAI } from './openai.js';
+import { scoreTree } from './validation.js';
 
 /* ── Step event types (used by SSE transport) ────────────────────────── */
 
