@@ -4,83 +4,36 @@
  * POST /api/run-code
  * Body: { language: string, code: string }
  *
- * Dynamically resolves the latest available Piston runtime version,
- * caches runtimes in-memory, retries once on transient failures.
+ * Uses Judge0 CE (ce.judge0.com) — free, no API key required.
+ * Returns { run: { stdout, stderr, code } } matching the previous Piston format.
  */
 
-const PISTON_BASE = 'https://emkc.org/api/v2/piston';
+const JUDGE0_BASE = 'https://ce.judge0.com';
 
-// Normalize UI language names → Piston identifiers
-const LANG_ALIAS: Record<string, string> = {
-  python:     'python',
-  javascript: 'javascript',
-  typescript: 'typescript',
-  java:       'java',
-  'c++':      'c++',
-  cpp:        'c++',
-  'c#':       'csharp',
-  csharp:     'csharp',
-  go:         'go',
-  rust:       'rust',
-  bash:       'bash',
+// Judge0 CE language IDs (stable across versions)
+const LANG_ID: Record<string, number> = {
+  python:     71,   // Python 3.8.1
+  javascript: 63,   // JavaScript (Node.js 12.14.0)
+  typescript: 74,   // TypeScript 3.7.4
+  java:       62,   // Java (OpenJDK 13.0.1)
+  'c++':      54,   // C++ (GCC 9.2.0)
+  cpp:        54,
+  'c#':       51,   // C# (Mono 6.6.0)
+  csharp:     51,
+  go:         60,   // Go 1.13.5
+  rust:       73,   // Rust 1.40.0
+  bash:       46,   // Bash 5.0.0
 };
 
-type PistonRuntime = { language: string; version: string; aliases: string[] };
+function getLangId(lang: string): number | null {
+  const key = lang.toLowerCase().trim();
+  return LANG_ID[key] ?? null;
+}
 
-// Module-level cache — survives warm lambda invocations
-let _runtimesCache: PistonRuntime[] | null = null;
-let _runtimesCachedAt = 0;
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-
-function fetchWithTimeout(url: string, options: RequestInit = {}, ms = 12000): Promise<Response> {
+function fetchWithTimeout(url: string, options: RequestInit = {}, ms = 25000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
-}
-
-async function getRuntimes(): Promise<PistonRuntime[]> {
-  const now = Date.now();
-  if (_runtimesCache && now - _runtimesCachedAt < CACHE_TTL) return _runtimesCache;
-  const resp = await fetchWithTimeout(`${PISTON_BASE}/runtimes`, {}, 8000);
-  if (!resp.ok) throw new Error(`Runtimes fetch failed: ${resp.status}`);
-  const data = await resp.json() as PistonRuntime[];
-  _runtimesCache = data;
-  _runtimesCachedAt = now;
-  return data;
-}
-
-async function resolveRuntime(
-  requestedLang: string
-): Promise<{ language: string; version: string } | null> {
-  const normalized = requestedLang.toLowerCase().trim();
-  const pistonLang = LANG_ALIAS[normalized] ?? normalized;
-  const runtimes = await getRuntimes();
-  const matches = runtimes.filter(
-    (r) => r.language === pistonLang || r.aliases?.includes(pistonLang)
-  );
-  if (matches.length === 0) return null;
-  matches.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
-  return { language: matches[0].language, version: matches[0].version };
-}
-
-async function executeOnPiston(language: string, version: string, code: string): Promise<Response> {
-  return fetchWithTimeout(
-    `${PISTON_BASE}/execute`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language,
-        version,
-        files: [{ content: code }],
-        stdin: '',
-        args: [],
-        compile_timeout: 10000,
-        run_timeout: 5000,
-      }),
-    },
-    20000
-  );
 }
 
 export const config = { api: { bodyParser: true } };
@@ -102,34 +55,51 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'language and code are required' });
   }
 
+  const langId = getLangId(language);
+  if (langId === null) {
+    return res.status(422).json({ error: `Language "${language}" is not supported.` });
+  }
+
   try {
-    const runtime = await resolveRuntime(language);
-    if (!runtime) {
-      return res.status(422).json({ error: `Language "${language}" is not supported.` });
-    }
-
-    let execResp = await executeOnPiston(runtime.language, runtime.version, code);
-
-    // Retry once on transient 5xx — bust cache so we re-resolve the version
-    if (execResp.status >= 500) {
-      console.warn(`[run-code] Piston returned ${execResp.status}, retrying with fresh runtime…`);
-      _runtimesCache = null;
-      const runtime2 = await resolveRuntime(language);
-      if (runtime2) {
-        execResp = await executeOnPiston(runtime2.language, runtime2.version, code);
-      }
-    }
+    // ?wait=true makes Judge0 execute synchronously (up to ~5s)
+    const execResp = await fetchWithTimeout(
+      `${JUDGE0_BASE}/submissions?base64_encoded=false&wait=true`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language_id: langId,
+          source_code: code,
+          stdin: '',
+        }),
+      },
+      25000
+    );
 
     if (!execResp.ok) {
       const detail = await execResp.text().catch(() => '');
-      console.error(`[run-code] Piston execute ${execResp.status}:`, detail);
+      console.error(`[run-code] Judge0 ${execResp.status}:`, detail);
       return res.status(503).json({
-        error: `Code execution service is temporarily unavailable (${execResp.status}). Please try again in a moment.`,
+        error: `Code execution service unavailable (${execResp.status}). Please try again.`,
       });
     }
 
-    const data = await execResp.json();
-    return res.status(200).json(data);
+    const data = await execResp.json() as {
+      stdout?: string | null;
+      stderr?: string | null;
+      compile_output?: string | null;
+      status?: { id: number; description: string };
+    };
+
+    // Combine stderr + compile errors into a single stderr string
+    const stderr = [data.stderr, data.compile_output].filter(Boolean).join('\n');
+    const stdout = data.stdout ?? '';
+    // status.id 3 = "Accepted" = clean exit; anything else = failure
+    const exitCode = data.status?.id === 3 ? 0 : 1;
+
+    return res.status(200).json({
+      run: { stdout, stderr, code: exitCode },
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Execution failed';
     console.error('[run-code]', message);
