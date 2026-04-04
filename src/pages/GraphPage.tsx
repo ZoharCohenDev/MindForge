@@ -322,6 +322,9 @@ export function GraphPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef      = useRef({ x: 0, y: 0, scale: 1 });
   const animRef      = useRef<number | null>(null);
+  const touchRef     = useRef<{ startX: number; startY: number; startVX: number; startVY: number; lastDist: number | null }>({
+    startX: 0, startY: 0, startVX: 0, startVY: 0, lastDist: null,
+  });
   // Keep viewRef in sync so animateTo always reads the latest view
   viewRef.current = view;
 
@@ -357,6 +360,51 @@ export function GraphPage() {
     return () => el.removeEventListener('wheel', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topics.length]);  // re-attach once topics load and canvas renders
+
+  // Non-passive touch listeners for pan + pinch-zoom on mobile
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onTouchStart = (e: TouchEvent) => {
+      if (animRef.current !== null) { cancelAnimationFrame(animRef.current); animRef.current = null; }
+      if (e.touches.length === 1) {
+        const t = e.touches[0]!;
+        touchRef.current = { startX: t.clientX, startY: t.clientY, startVX: viewRef.current.x, startVY: viewRef.current.y, lastDist: null };
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[1]!.clientX - e.touches[0]!.clientX;
+        const dy = e.touches[1]!.clientY - e.touches[0]!.clientY;
+        touchRef.current.lastDist = Math.hypot(dx, dy);
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        const t = e.touches[0]!;
+        const dx = t.clientX - touchRef.current.startX;
+        const dy = t.clientY - touchRef.current.startY;
+        setView(v => ({ ...v, x: touchRef.current.startVX + dx, y: touchRef.current.startVY + dy }));
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[1]!.clientX - e.touches[0]!.clientX;
+        const dy = e.touches[1]!.clientY - e.touches[0]!.clientY;
+        const dist = Math.hypot(dx, dy);
+        if (touchRef.current.lastDist !== null && touchRef.current.lastDist > 0) {
+          const ratio = dist / touchRef.current.lastDist;
+          setView(v => ({ ...v, scale: Math.max(0.15, Math.min(5, v.scale * ratio)) }));
+        }
+        touchRef.current.lastDist = dist;
+      }
+    };
+    const onTouchEnd = () => { touchRef.current.lastDist = null; };
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    el.addEventListener('touchend',   onTouchEnd,   { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove',  onTouchMove);
+      el.removeEventListener('touchend',   onTouchEnd);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topics.length]);
 
   const { edges, allNodes } = useMemo(() => buildLayout(topics), [topics]);
 
@@ -442,7 +490,7 @@ export function GraphPage() {
           <h2>Knowledge Graph</h2>
           <p>Your mastered topics visualised — only ✓ checked items appear</p>
         </div>
-        <div className="tr-page-bar-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="tr-page-bar-right gp-header-controls">
           {/* Tree switcher */}
           <div className="tr-tree-switcher">
             <button
@@ -462,7 +510,7 @@ export function GraphPage() {
               Full Stack
             </button>
           </div>
-          <span style={{ fontSize: '0.82rem', color: 'var(--tk-text-muted)' }}>
+          <span className="gp-count-label">
             {doneCount} mastered · {totalNodes} nodes shown
           </span>
           {/* Zoom controls */}
@@ -496,7 +544,7 @@ export function GraphPage() {
       {/* Empty state */}
       {doneCount === 0 ? (
         <div
-          className="glass-card"
+          className="glass-card gp-empty-card"
           style={{
             minHeight: '460px', display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', gap: '16px',
@@ -513,13 +561,13 @@ export function GraphPage() {
         /* Graph canvas */
         <div
           ref={containerRef}
+          className="gp-canvas"
           style={{
             borderRadius: '16px',
             overflow: 'hidden',
             background: 'radial-gradient(ellipse at 50% 42%, #0d1030 0%, #050710 100%)',
             border: '1px solid rgba(99,102,241,0.22)',
             position: 'relative',
-            minHeight: '620px',
             cursor: 'grab',
             userSelect: 'none',
           }}
@@ -535,7 +583,7 @@ export function GraphPage() {
             fontSize: '0.69rem', color: 'rgba(255,255,255,0.25)',
             pointerEvents: 'none', zIndex: 5,
           }}>
-            Scroll to zoom · Drag to pan
+            Pinch/scroll to zoom · Swipe/drag to pan
           </p>
 
           {/* Legend */}
@@ -607,7 +655,7 @@ export function GraphPage() {
             viewBox="0 0 1120 1120"
             width="100%"
             height="100%"
-            style={{ display: 'block', minHeight: '620px' }}
+            style={{ display: 'block', minHeight: '100%' }}
           >
             <g transform={`translate(${tx} ${ty}) scale(${view.scale})`}>
 
@@ -735,15 +783,13 @@ export function GraphPage() {
           {selectedNode && (
             <div
               onClick={e => e.stopPropagation()}
+              className="gp-side-panel"
               style={{
-                position: 'absolute', top: 0, right: 0, bottom: 0,
-                width: '380px',
                 background: 'rgba(4,6,18,0.97)',
                 borderLeft: `1px solid ${selectedNode.color}40`,
                 backdropFilter: 'blur(24px)',
                 display: 'flex', flexDirection: 'column',
                 zIndex: 30,
-                boxShadow: `-12px 0 40px rgba(0,0,0,0.6)`,
               }}
             >
               {/* ── Sticky header ── */}
