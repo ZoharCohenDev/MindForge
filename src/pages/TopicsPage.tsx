@@ -868,7 +868,7 @@ except ImportError:
       {/* Modal */}
       {modal && (
         <div className="tr-backdrop" onClick={closeModal}>
-          <div className={`tr-modal${modal.type === "view-notes" ? " tr-modal--notes" : ""}`} onClick={(e) => e.stopPropagation()}>
+          <div className={`tr-modal${modal.type === "view-notes" ? " tr-modal--notes" : ""}${(modal.type === "note" || modal.type === "edit-note") ? " tr-modal--form" : ""}`} onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="tr-modal-header">
               <div className="tr-modal-icon">

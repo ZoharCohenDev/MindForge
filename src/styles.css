@@ -3045,6 +3045,11 @@ code {
   min-height: 0;
 }
 
+/* Form modal (note / edit-note) — tall enough to not look bare */
+.tr-modal--form {
+  min-height: min(640px, calc(100dvh - 2rem));
+}
+
 /* Notes wide modal — full height needed for two-panel layout */
 .tr-modal--notes {
   width: min(1100px, 96vw);
