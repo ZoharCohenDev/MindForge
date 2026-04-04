@@ -1973,7 +1973,6 @@ code {
 .tr-modal-form {
   display: grid;
   gap: 0.85rem;
-  height: 100vh;
 }
 
 .tr-modal-actions {
@@ -3036,7 +3035,7 @@ code {
 
 /* Form modal (note / edit-note) — tall enough to not look bare */
 .tr-modal--form {
-  min-height: min(640px, calc(100dvh - 3rem));
+  min-height: min(1200px, calc(100dvh - 3rem));
 }
 
 /* Compact modal (confirm dialogs etc.) — just wraps its content */
