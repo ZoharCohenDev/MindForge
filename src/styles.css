@@ -975,6 +975,40 @@ code {
   --tk-check-border:  rgba(255,255,255,0.22);
   --tk-modal-bg:      #1e1e1e;
   --tk-transition:    background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  /* Graph canvas */
+  --gp-label-done:     rgba(255,255,255,0.65);
+  --gp-label-path:     rgba(255,255,255,0.28);
+  --gp-hint:           rgba(255,255,255,0.25);
+  --gp-legend-text:    rgba(255,255,255,0.38);
+  --gp-legend-divider: rgba(255,255,255,0.07);
+  --gp-legend-dashed:  rgba(255,255,255,0.3);
+  --gp-glow-1:         rgba(255,255,255,0.008);
+  --gp-glow-2:         rgba(255,255,255,0.014);
+  --gp-tooltip-bg:     rgba(6,8,22,0.92);
+
+  /* Graph side panel */
+  --gp-panel-bg:              rgba(4,6,18,0.97);
+  --gp-panel-header-end:      rgba(4,6,18,0);
+  --gp-panel-title:           #ffffff;
+  --gp-panel-muted:           rgba(255,255,255,0.25);
+  --gp-panel-faint:           rgba(255,255,255,0.22);
+  --gp-panel-divider:         rgba(255,255,255,0.07);
+  --gp-panel-btn-bg:          rgba(255,255,255,0.06);
+  --gp-panel-btn-border:      rgba(255,255,255,0.1);
+  --gp-panel-btn-color:       rgba(255,255,255,0.4);
+  --gp-panel-empty-bg:        rgba(255,255,255,0.025);
+  --gp-panel-empty-border:    rgba(255,255,255,0.06);
+  --gp-panel-status-path:     rgba(255,255,255,0.3);
+  --gp-panel-status-path-bg:  rgba(255,255,255,0.05);
+  --gp-panel-status-path-bdl: rgba(255,255,255,0.1);
+
+  /* Note card */
+  --gp-note-bg:      rgba(255,255,255,0.025);
+  --gp-note-title:   rgba(255,255,255,0.85);
+  --gp-note-body:    rgba(255,255,255,0.55);
+  --gp-code-bg:      rgba(0,0,0,0.5);
+  --gp-code-color:   #a5f3fc;
 }
 
 /* ── Light mode overrides ──────────────────────────────────────────────────── */
@@ -996,6 +1030,40 @@ code {
   --tk-check-border:  rgba(100,116,139,0.35);
   --tk-modal-bg:      #ffffff;
   --tk-transition:    background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  /* Graph canvas */
+  --gp-label-done:     rgba(15,23,42,0.75);
+  --gp-label-path:     rgba(15,23,42,0.35);
+  --gp-hint:           rgba(15,23,42,0.3);
+  --gp-legend-text:    rgba(15,23,42,0.55);
+  --gp-legend-divider: rgba(15,23,42,0.1);
+  --gp-legend-dashed:  rgba(15,23,42,0.35);
+  --gp-glow-1:         rgba(99,102,241,0.05);
+  --gp-glow-2:         rgba(99,102,241,0.1);
+  --gp-tooltip-bg:     rgba(248,250,252,0.96);
+
+  /* Graph side panel */
+  --gp-panel-bg:              rgba(248,250,252,0.98);
+  --gp-panel-header-end:      rgba(248,250,252,0);
+  --gp-panel-title:           #0f172a;
+  --gp-panel-muted:           rgba(15,23,42,0.4);
+  --gp-panel-faint:           rgba(15,23,42,0.3);
+  --gp-panel-divider:         rgba(15,23,42,0.1);
+  --gp-panel-btn-bg:          rgba(15,23,42,0.06);
+  --gp-panel-btn-border:      rgba(15,23,42,0.12);
+  --gp-panel-btn-color:       rgba(15,23,42,0.45);
+  --gp-panel-empty-bg:        rgba(15,23,42,0.04);
+  --gp-panel-empty-border:    rgba(15,23,42,0.1);
+  --gp-panel-status-path:     rgba(15,23,42,0.4);
+  --gp-panel-status-path-bg:  rgba(15,23,42,0.05);
+  --gp-panel-status-path-bdl: rgba(15,23,42,0.12);
+
+  /* Note card */
+  --gp-note-bg:      rgba(15,23,42,0.05);
+  --gp-note-title:   rgba(15,23,42,0.85);
+  --gp-note-body:    rgba(15,23,42,0.6);
+  --gp-code-bg:      rgba(15,23,42,0.08);
+  --gp-code-color:   #1e40af;
 }
 
 [data-theme="light"] {
@@ -3466,6 +3534,12 @@ code {
 .gp-canvas {
   min-height: 620px;
   height: calc(100dvh - 160px);
+  background: radial-gradient(ellipse at 50% 42%, #111118 0%, #0a0a10 100%);
+}
+
+[data-theme="light"] .gp-canvas {
+  background: radial-gradient(ellipse at 50% 42%, #c8cee8 0%, #b8c0d8 100%);
+  border-color: rgba(99,102,241,0.2) !important;
 }
 
 /* Graph page: take full height, no scroll */

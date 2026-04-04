@@ -289,7 +289,7 @@ except ImportError:
       border: `1px solid ${accentColor}25`,
       borderRadius: '8px',
       overflow: 'hidden',
-      background: 'rgba(255,255,255,0.025)',
+      background: 'var(--gp-note-bg)',
     }}>
       {/* Note title bar */}
       <button
@@ -303,7 +303,7 @@ except ImportError:
         <span style={{ color: accentColor, flexShrink: 0, opacity: 0.8 }}>
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
-        <span style={{ fontWeight: 600, fontSize: '0.82rem', color: 'rgba(255,255,255,0.85)', flex: 1 }}>
+        <span style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--gp-note-title)', flex: 1 }}>
           {note.title}
         </span>
         {hasExtra && (
@@ -316,7 +316,7 @@ except ImportError:
       {open && (
         <div style={{ padding: '0 12px 11px' }}>
           {/* Body text */}
-          <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: 'var(--gp-note-body)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
             {note.content}
           </p>
 
@@ -329,9 +329,9 @@ except ImportError:
               </div>
               <pre style={{
                 margin: 0, padding: '9px 11px',
-                background: 'rgba(0,0,0,0.5)',
+                background: 'var(--gp-code-bg)',
                 borderRadius: '6px',
-                fontSize: '0.73rem', color: '#a5f3fc',
+                fontSize: '0.73rem', color: 'var(--gp-code-color)',
                 lineHeight: 1.6, overflowX: 'auto',
                 whiteSpace: 'pre', fontFamily: 'ui-monospace, Menlo, monospace',
                 border: '1px solid rgba(129,140,248,0.2)',
@@ -359,9 +359,9 @@ except ImportError:
               </div>
               <pre style={{
                 margin: 0, padding: '9px 11px',
-                background: 'rgba(0,0,0,0.5)',
+                background: 'var(--gp-code-bg)',
                 borderRadius: '6px',
-                fontSize: '0.73rem', color: '#a5f3fc',
+                fontSize: '0.73rem', color: 'var(--gp-code-color)',
                 lineHeight: 1.6, overflowX: 'auto',
                 whiteSpace: 'pre', fontFamily: 'ui-monospace, Menlo, monospace',
                 border: '1px solid rgba(129,140,248,0.2)',
@@ -688,7 +688,6 @@ export function GraphPage() {
           style={{
             borderRadius: '16px',
             overflow: 'hidden',
-            background: 'radial-gradient(ellipse at 50% 42%, #0d1030 0%, #050710 100%)',
             border: '1px solid rgba(99,102,241,0.22)',
             position: 'relative',
             cursor: 'grab',
@@ -703,7 +702,7 @@ export function GraphPage() {
           {/* Hint */}
           <p style={{
             position: 'absolute', top: 13, left: 16, margin: 0,
-            fontSize: '0.69rem', color: 'rgba(255,255,255,0.25)',
+            fontSize: '0.69rem', color: 'var(--gp-hint)',
             pointerEvents: 'none', zIndex: 5,
           }}>
             Pinch/scroll to zoom · Swipe/drag to pan
@@ -722,17 +721,17 @@ export function GraphPage() {
                   background: ORBIT_COLORS[i],
                   boxShadow: `0 0 7px ${ORBIT_COLORS[i]}99`,
                 }} />
-                <span style={{ fontSize: '0.67rem', color: 'rgba(255,255,255,0.38)' }}>{label}</span>
+                <span style={{ fontSize: '0.67rem', color: 'var(--gp-legend-text)' }}>{label}</span>
               </div>
             ))}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '3px 0' }} />
+            <div style={{ borderTop: '1px solid var(--gp-legend-divider)', margin: '3px 0' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
               <div style={{
                 width: 9, height: 9, borderRadius: '50%',
                 background: 'transparent',
-                border: '1.5px dashed rgba(255,255,255,0.3)',
+                border: '1.5px dashed var(--gp-legend-dashed)',
               }} />
-              <span style={{ fontSize: '0.67rem', color: 'rgba(255,255,255,0.28)' }}>Pathway (not yet ✓)</span>
+              <span style={{ fontSize: '0.67rem', color: 'var(--gp-legend-text)' }}>Pathway (not yet ✓)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
               <div style={{
@@ -740,7 +739,7 @@ export function GraphPage() {
                 background: ORBIT_COLORS[0],
                 boxShadow: `0 0 7px ${ORBIT_COLORS[0]}99`,
               }} />
-              <span style={{ fontSize: '0.67rem', color: 'rgba(255,255,255,0.38)' }}>Mastered (✓)</span>
+              <span style={{ fontSize: '0.67rem', color: 'var(--gp-legend-text)' }}>Mastered (✓)</span>
             </div>
           </div>
 
@@ -749,7 +748,7 @@ export function GraphPage() {
             <div style={{
               position: 'absolute', bottom: 18, left: '50%',
               transform: 'translateX(-50%)',
-              background: 'rgba(6,8,22,0.92)',
+              background: 'var(--gp-tooltip-bg)',
               border: `1px solid ${hovered.color}55`,
               borderRadius: '9px',
               padding: '7px 18px',
@@ -766,7 +765,7 @@ export function GraphPage() {
               </span>
               <span style={{
                 marginLeft: '8px', fontSize: '0.7rem', fontWeight: 600,
-                color: hovered.isDone ? '#34d399' : 'rgba(255,255,255,0.3)',
+                color: hovered.isDone ? '#34d399' : 'var(--gp-label-path)',
               }}>
                 {hovered.isDone ? '✓ mastered' : '○ pathway'}
               </span>
@@ -783,8 +782,8 @@ export function GraphPage() {
             <g transform={`translate(${tx} ${ty}) scale(${view.scale})`}>
 
               {/* Subtle center glow */}
-              <circle cx={CX} cy={CY} r={90} fill="rgba(255,255,255,0.008)" />
-              <circle cx={CX} cy={CY} r={45} fill="rgba(255,255,255,0.014)" />
+              <circle cx={CX} cy={CY} r={90} fill="var(--gp-glow-1)" />
+              <circle cx={CX} cy={CY} r={45} fill="var(--gp-glow-2)" />
 
               {/* Edges — solid for done→done, dashed for pathway links */}
               {edges.map((e, i) => (
@@ -805,7 +804,7 @@ export function GraphPage() {
                   cx={n.x} cy={n.y}
                   r={hovered?.topic.id === n.topic.id ? n.r * 3.2 : n.r * 1.9}
                   fill={n.color}
-                  opacity={hovered?.topic.id === n.topic.id ? 0.18 : (n.isDone ? 0.08 : 0.03)}
+                  opacity={hovered?.topic.id === n.topic.id ? 0.22 : (n.isDone ? 0.1 : 0.07)}
                   style={{ transition: 'r 0.18s, opacity 0.18s' }}
                 />
               ))}
@@ -829,10 +828,10 @@ export function GraphPage() {
                     <>
                       <circle
                         cx={n.x} cy={n.y} r={n.r}
-                        fill="rgba(0,0,0,0.35)"
+                        fill={`${n.color}22`}
                         stroke={n.color}
-                        strokeWidth="1.2"
-                        strokeOpacity="0.45"
+                        strokeWidth="1.4"
+                        strokeOpacity="0.7"
                         strokeDasharray="3 3"
                         style={{ cursor: 'pointer' }}
                         onMouseEnter={() => setHovered(n)}
@@ -891,7 +890,7 @@ export function GraphPage() {
                     textAnchor={anchor}
                     fontSize={fs}
                     fontWeight={n.depth <= 1 || isHov ? '700' : '400'}
-                    fill={isHov ? n.color : n.isDone ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.28)'}
+                    fill={isHov ? n.color : n.isDone ? 'var(--gp-label-done)' : 'var(--gp-label-path)'}
                     fontFamily="system-ui, -apple-system, sans-serif"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                   >
@@ -909,7 +908,7 @@ export function GraphPage() {
               onClick={e => e.stopPropagation()}
               className="gp-side-panel"
               style={{
-                background: 'rgba(4,6,18,0.97)',
+                background: 'var(--gp-panel-bg)',
                 borderLeft: `1px solid ${selectedNode.color}40`,
                 backdropFilter: 'blur(24px)',
                 display: 'flex', flexDirection: 'column',
@@ -921,7 +920,7 @@ export function GraphPage() {
                 padding: '16px 16px 12px',
                 borderBottom: `1px solid ${selectedNode.color}30`,
                 flexShrink: 0,
-                background: `linear-gradient(135deg, ${selectedNode.color}12 0%, rgba(4,6,18,0) 100%)`,
+                background: `linear-gradient(135deg, ${selectedNode.color}12 0%, var(--gp-panel-header-end) 100%)`,
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <div style={{
@@ -930,20 +929,21 @@ export function GraphPage() {
                     boxShadow: `0 0 10px ${selectedNode.color}99`,
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '1rem', color: '#fff', lineHeight: 1.3, wordBreak: 'break-word' }}>
+                    <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--gp-panel-title)', lineHeight: 1.3, wordBreak: 'break-word' }}>
                       {selectedNode.topic.title}
                     </div>
                     <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{
                         fontSize: '0.67rem', fontWeight: 600,
-                        color: selectedNode.isDone ? '#34d399' : 'rgba(255,255,255,0.3)',
-                        background: selectedNode.isDone ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${selectedNode.isDone ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.1)'}`,
+                        color: selectedNode.isDone ? '#34d399' : 'var(--gp-panel-status-path)',
+                        background: selectedNode.isDone ? 'rgba(52,211,153,0.12)' : 'var(--gp-panel-status-path-bg)',
+                        border: `1px solid ${selectedNode.isDone ? 'rgba(52,211,153,0.25)' : 'var(--gp-panel-status-path-bdl)'}`,
+
                         borderRadius: '4px', padding: '1px 7px',
                       }}>
                         {selectedNode.isDone ? '✓ mastered' : '○ pathway'}
                       </span>
-                      <span style={{ fontSize: '0.67rem', color: 'rgba(255,255,255,0.25)' }}>
+                      <span style={{ fontSize: '0.67rem', color: 'var(--gp-panel-muted)' }}>
                         Level {selectedNode.depth}
                       </span>
                     </div>
@@ -951,9 +951,9 @@ export function GraphPage() {
                   <button
                     onClick={() => setSelectedNode(null)}
                     style={{
-                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'var(--gp-panel-btn-bg)', border: '1px solid var(--gp-panel-btn-border)',
                       borderRadius: '6px', padding: '5px 6px', cursor: 'pointer',
-                      color: 'rgba(255,255,255,0.4)', lineHeight: 1, flexShrink: 0,
+                      color: 'var(--gp-panel-btn-color)', lineHeight: 1, flexShrink: 0,
                     }}
                     aria-label="Close"
                   >
@@ -977,11 +977,11 @@ export function GraphPage() {
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
                     padding: '12px 14px', marginBottom: '16px',
-                    background: 'rgba(255,255,255,0.025)',
-                    borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)',
+                    background: 'var(--gp-panel-empty-bg)',
+                    borderRadius: '8px', border: '1px solid var(--gp-panel-empty-border)',
                   }}>
-                    <BookOpen size={13} color="rgba(255,255,255,0.2)" />
-                    <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>
+                    <BookOpen size={13} color="var(--gp-panel-muted)" />
+                    <span style={{ fontSize: '0.78rem', color: 'var(--gp-panel-muted)', fontStyle: 'italic' }}>
                       No notes for this topic yet.
                     </span>
                   </div>
@@ -993,14 +993,14 @@ export function GraphPage() {
                   <>
                     <div style={{
                       fontSize: '0.67rem', fontWeight: 700,
-                      color: 'rgba(255,255,255,0.22)',
+                      color: 'var(--gp-panel-faint)',
                       textTransform: 'uppercase', letterSpacing: '0.08em',
                       marginBottom: '12px', marginTop: '4px',
                       display: 'flex', alignItems: 'center', gap: '6px',
                     }}>
-                      <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+                      <div style={{ flex: 1, height: '1px', background: 'var(--gp-panel-divider)' }} />
                       Children notes
-                      <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+                      <div style={{ flex: 1, height: '1px', background: 'var(--gp-panel-divider)' }} />
                     </div>
                     {selectedNode.children
                       .filter(c => (notesByTopic[c.topic.id] ?? []).length > 0)
