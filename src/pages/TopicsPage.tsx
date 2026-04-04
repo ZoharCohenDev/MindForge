@@ -411,14 +411,15 @@ export function TopicsPage() {
           code: block.code,
         }),
       });
-      if (!resp.ok) throw new Error(`Piston error ${resp.status}`);
-      const data = await resp.json() as { run: { stdout: string; stderr: string; code: number } };
+      const data = await resp.json() as any;
+      if (!resp.ok) throw new Error(data?.error ?? `Execution failed (${resp.status})`);
+      const typed = data as { run: { stdout: string; stderr: string; code: number } };
       setBlockOutputs(prev => ({
         ...prev,
         [idx]: {
-          stdout: data.run.stdout ?? '',
-          stderr: data.run.stderr ?? '',
-          exitCode: data.run.code ?? 0,
+          stdout: typed.run.stdout ?? '',
+          stderr: typed.run.stderr ?? '',
+          exitCode: typed.run.code ?? 0,
         },
       }));
     } catch (err: unknown) {
