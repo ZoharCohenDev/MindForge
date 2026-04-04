@@ -1596,11 +1596,16 @@ code {
 
 /* View notes modal body */
 .tr-view-notes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 2rem;
   color: var(--tk-text-muted);
   font-size: 0.88rem;
-  margin: 0;
   text-align: center;
-  padding: 1.5rem 0;
+  opacity: 0.6;
 }
 
 /* Wide modal variant for notes viewer */
@@ -3026,7 +3031,7 @@ code {
 .tr-modal {
   width: min(720px, 96vw);
   max-height: calc(100dvh - 2rem);
-  height: calc(100dvh - 2rem);
+  /* NO forced height — auto-sizes to content; only the notes modal is full-height */
   display: flex;
   flex-direction: column;
 }
@@ -3040,7 +3045,7 @@ code {
   min-height: 0;
 }
 
-/* Notes wide modal */
+/* Notes wide modal — full height needed for two-panel layout */
 .tr-modal--notes {
   width: min(1100px, 96vw);
   height: calc(100dvh - 2rem);
