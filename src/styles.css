@@ -3043,6 +3043,12 @@ code {
   width: min(480px, 96vw);
 }
 
+/* Dialog modal (single-input modals: add subject, add concept, etc.) */
+.tr-modal--dialog {
+  width: min(520px, 96vw);
+  min-height: min(380px, calc(100dvh - 3rem));
+}
+
 /* Danger icon variant */
 .tr-modal-icon--danger {
   background: rgba(239,68,68,0.1) !important;
