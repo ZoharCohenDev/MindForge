@@ -2126,9 +2126,11 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 6px;
   padding: 7px 10px;
   background: rgba(99, 102, 241, 0.07);
   border-bottom: 1px solid var(--tk-border);
+  flex-wrap: wrap;
 }
 
 .tr-code-block-lang-wrap {
@@ -2181,6 +2183,70 @@ code {
 
 .tr-code-block-remove:hover {
   background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+/* ── Code block — Convert with AI ──────────────── */
+
+.cb-convert-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  justify-content: center;
+}
+
+.cb-convert-icon {
+  color: var(--tk-text-muted);
+  flex-shrink: 0;
+}
+
+.cb-convert-select {
+  /* inherits .tr-lang-select; slightly smaller padding */
+  padding: 3px 22px 3px 7px;
+  font-weight: 600;
+}
+
+.cb-convert-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--tk-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.13s ease, opacity 0.13s ease;
+}
+
+.cb-convert-btn:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.cb-convert-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cb-convert-msg {
+  margin: 0;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  border-bottom: 1px solid var(--tk-border);
+}
+
+.cb-convert-msg--info {
+  background: rgba(99, 102, 241, 0.06);
+  color: var(--tk-text-muted);
+}
+
+.cb-convert-msg--error {
+  background: rgba(239, 68, 68, 0.07);
   color: #f87171;
 }
 

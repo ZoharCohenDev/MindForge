@@ -1,1 +1,1 @@
-{"root":["./api/generate-explanation.ts"],"version":"5.9.3"}
+{"root":["./api/convert-code.ts","./api/generate-explanation.ts"],"version":"5.9.3"}

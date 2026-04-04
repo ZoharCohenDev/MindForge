@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowRightLeft,
   BookOpen,
   Check,
   ChevronRight,
@@ -136,6 +137,10 @@ export function TopicsPage() {
   const [isSavingModal, setIsSavingModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // Per-block convert state
+  const [convertingIdx, setConvertingIdx] = useState<number | null>(null);
+  const [convertTargets, setConvertTargets] = useState<Record<number, string>>({});
+  const [convertErrors, setConvertErrors] = useState<Record<number, string>>({});
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -250,6 +255,9 @@ export function TopicsPage() {
     setConfirmDelete(null);
     setAiError(null);
     setIsGenerating(false);
+    setConvertingIdx(null);
+    setConvertTargets({});
+    setConvertErrors({});
   };
 
   const insertMathSymbol = (symbol: string) => {
@@ -373,6 +381,51 @@ export function TopicsPage() {
       console.error('[AI generate]', err);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const CONVERT_LANGS = ['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','SQL','Bash'];
+
+  const handleConvertCode = async (idx: number) => {
+    const block = codeBlocks[idx];
+    if (!block?.code.trim()) return;
+    const targetLanguage = convertTargets[idx] ?? CONVERT_LANGS[0];
+    if (targetLanguage.toLowerCase() === block.language.toLowerCase()) {
+      setConvertErrors(prev => ({ ...prev, [idx]: 'Choose a different target language.' }));
+      return;
+    }
+    setConvertingIdx(idx);
+    setConvertErrors(prev => { const next = { ...prev }; delete next[idx]; return next; });
+    try {
+      const response = await fetch('/api/convert-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: block.code,
+          sourceLanguage: block.language,
+          targetLanguage,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? `Server error ${response.status}`);
+      }
+      const data = await response.json() as { convertedCode?: string; targetLanguage?: string; notes?: string };
+      const converted = data.convertedCode?.trim();
+      if (!converted) throw new Error('AI returned empty code.');
+      setCodeBlocks(prev => prev.map((b, i) =>
+        i === idx ? { language: data.targetLanguage ?? targetLanguage, code: converted } : b
+      ));
+      // Show notes as a brief inline message if present
+      if (data.notes?.trim()) {
+        setConvertErrors(prev => ({ ...prev, [idx]: `ℹ️ ${data.notes}` }));
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Conversion failed';
+      setConvertErrors(prev => ({ ...prev, [idx]: msg }));
+      console.error('[convert-code]', err);
+    } finally {
+      setConvertingIdx(null);
     }
   };
 
@@ -806,6 +859,32 @@ export function TopicsPage() {
                                 ))}
                               </select>
                             </div>
+
+                            {/* Convert with AI */}
+                            <div className="cb-convert-wrap">
+                              <ArrowRightLeft size={11} className="cb-convert-icon" />
+                              <select
+                                className="tr-lang-select cb-convert-select"
+                                value={convertTargets[idx] ?? CONVERT_LANGS[0]}
+                                onChange={(e) => setConvertTargets(prev => ({ ...prev, [idx]: e.target.value }))}
+                                disabled={convertingIdx === idx}
+                                title="Target language"
+                              >
+                                {CONVERT_LANGS.map(lang => (
+                                  <option key={lang} value={lang}>{lang}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="cb-convert-btn"
+                                onClick={() => void handleConvertCode(idx)}
+                                disabled={convertingIdx === idx || isSavingModal || !block.code.trim()}
+                                title="Convert code to target language using AI"
+                              >
+                                {convertingIdx === idx ? 'Converting…' : 'Convert'}
+                              </button>
+                            </div>
+
                             <button
                               type="button"
                               className="tr-code-block-remove"
@@ -815,6 +894,11 @@ export function TopicsPage() {
                               <X size={12} />
                             </button>
                           </div>
+                          {convertErrors[idx] && (
+                            <p className={`cb-convert-msg${convertErrors[idx].startsWith('ℹ️') ? ' cb-convert-msg--info' : ' cb-convert-msg--error'}`}>
+                              {convertErrors[idx]}
+                            </p>
+                          )}
                           <textarea
                             className="tr-code-input"
                             rows={5}

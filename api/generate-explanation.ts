@@ -10,18 +10,30 @@
  */
 
 const SYSTEM_PROMPT =
-  'You are a technical education assistant. Respond with valid JSON only — no markdown fences, no extra prose, just the raw JSON object.';
+  'You are a senior software engineer writing concise, practical learning notes. ' +
+  'Your output is code-first: let code do most of the teaching. ' +
+  'Respond with valid JSON only — no markdown fences, no extra text, just the raw JSON object.';
 
 function buildUserPrompt(topicTitle: string, topicPath?: string): string {
-  const context = topicPath ? `, in the context of: ${topicPath}` : '';
-  return `Create a learning explanation for the topic: "${topicTitle}"${context}.
+  const pathContext = topicPath ? `\nFull topic path: ${topicPath}` : '';
+  return `Create a sharp, practical learning note for: "${topicTitle}"${pathContext}
 
-Return ONLY this JSON object, nothing else:
+Rules:
+- "title": A clear, specific title (max 8 words).
+- "explanation": 2–4 SHORT paragraphs. Be direct and practical. Skip intros like "In this note…". Add a real-world analogy ONLY if it genuinely clarifies the concept — never force one. Focus on WHY it matters and HOW it works.
+- "code": This is the most important field. Write practical, well-commented, teaching-oriented code.
+  - If the topic is a broad concept (e.g. "Data Structures", "Sorting Algorithms", "Design Patterns"), include MULTIPLE labeled examples covering the key subtypes/implementations in a single code block, separated by clear comments.
+  - If the topic is specific (e.g. "Binary Search"), write one focused, complete example with edge cases shown.
+  - Use Python unless another language is clearly more idiomatic for the topic.
+  - Return an empty string ONLY if code genuinely does not apply (e.g. a soft concept like "Agile Methodology").
+- "formula": A key formula or notation if relevant (e.g. "O(log n)", "y = wx + b"). Return empty string if not applicable.
+
+Return ONLY this JSON, nothing else:
 {
-  "title": "A concise, clear title for this explanation",
-  "explanation": "A thorough explanation (3-5 paragraphs) covering key concepts, intuition, and practical understanding",
-  "code": "A relevant code example if applicable, otherwise an empty string",
-  "formula": "A key formula or mathematical expression if applicable, otherwise an empty string"
+  "title": "...",
+  "explanation": "...",
+  "code": "...",
+  "formula": "..."
 }`;
 }
 
@@ -75,7 +87,7 @@ async function callClaude(
     },
     body: JSON.stringify({
       model: 'claude-3-5-haiku-20241022',
-      max_tokens: 1500,
+      max_tokens: 2000,
       system: SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: buildUserPrompt(topicTitle, topicPath) },

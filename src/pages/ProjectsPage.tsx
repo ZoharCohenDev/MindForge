@@ -223,7 +223,7 @@ export function ProjectsPage() {
                   type="text"
                   value={form.name}
                   onChange={set('name')}
-                  placeholder="e.g. LearnOS, ML Classifier"
+                  placeholder="e.g. MindForge, ML Classifier"
                   autoFocus
                 />
               </label>

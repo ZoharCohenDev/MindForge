@@ -20,7 +20,7 @@ export function Sidebar() {
         <div className="sidebar-brand">
           <div className="brand-icon">L</div>
           <div>
-            <strong>LearnOS</strong>
+            <strong>MindForge</strong>
             <p>{session?.user.email}</p>
           </div>
         </div>

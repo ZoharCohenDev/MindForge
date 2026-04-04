@@ -43,7 +43,7 @@ export function AuthGate() {
             <BrainCircuit size={24} />
           </div>
           <div>
-            <h1>LearnOS</h1>
+            <h1>MindForge</h1>
             <p>Your personal learning HQ.</p>
           </div>
         </div>
