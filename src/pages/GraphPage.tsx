@@ -430,9 +430,10 @@ export function GraphPage() {
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth <= 768);
   const [searchParams] = useSearchParams();
 
-  const dragging    = useRef(false);
-  const lastPos     = useRef({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
+  const dragging     = useRef(false);
+  const lastPos      = useRef({ x: 0, y: 0 });
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const sidePanelRef  = useRef<HTMLDivElement>(null);
   const viewRef      = useRef({ x: 0, y: 0, scale: 1 });
   const animRef      = useRef<number | null>(null);
   const touchRef     = useRef<{ startX: number; startY: number; startVX: number; startVY: number; lastDist: number | null }>({
@@ -459,6 +460,8 @@ export function GraphPage() {
     const el = containerRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
+      // Don't zoom when scrolling inside the notes side panel
+      if (sidePanelRef.current?.contains(e.target as Node)) return;
       e.preventDefault();
       e.stopPropagation();
       // Zoom towards the mouse cursor position inside the SVG
@@ -902,6 +905,7 @@ export function GraphPage() {
           {/* ── Desktop side panel (right rail) ── */}
           {selectedNode && !isMobile && (
             <div
+              ref={sidePanelRef}
               onClick={e => e.stopPropagation()}
               className="gp-side-panel"
               style={{

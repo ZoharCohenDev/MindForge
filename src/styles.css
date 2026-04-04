@@ -1967,7 +1967,7 @@ code {
   gap: 0.85rem;
   overflow-y: auto;
   min-height: 0;
-  flex: 1 1 0;
+  flex: 1 1 auto;
 }
 
 .tr-modal-form {
@@ -3033,10 +3033,10 @@ code {
 .tr-modal-header  { flex-shrink: 0; }
 .tr-modal-actions { flex-shrink: 0; }
 
-/* Form modal (explanation / edit-note) — starts at 600px, grows with content */
+/* Form modal (explanation / edit-note) — starts at 600px, grows up to 1000px */
 .tr-modal--form {
   min-height: min(600px, calc(100dvh - 3rem));
-  max-height: calc(100dvh - 3rem);
+  max-height: min(1000px, calc(100dvh - 3rem));
 }
 
 /* Compact modal (confirm dialogs) — wraps its content */
