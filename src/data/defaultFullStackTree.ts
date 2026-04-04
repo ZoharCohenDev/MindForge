@@ -1,8 +1,4 @@
-export type SeedTopic = {
-  title: string;
-  summary?: string;
-  children?: SeedTopic[];
-};
+import type { SeedNode } from "../types";
 
 export const defaultFullStackTree: SeedTopic = {
   title: "Full Stack Development",

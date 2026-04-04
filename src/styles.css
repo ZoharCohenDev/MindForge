@@ -2161,6 +2161,397 @@ code {
   line-height: 1;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   TREE LIST VIEW  (tl-*)  —  "My Trees" card grid + create modal
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Back button shown in the open-tree header bar */
+.tr-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--tk-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.13s ease;
+  margin-bottom: 0.2rem;
+}
+
+.tr-back-btn:hover {
+  color: var(--tk-text);
+}
+
+/* Responsive card grid */
+.tl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+/* Tree card — clickable */
+.tl-card {
+  border-radius: 14px;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+  border: 1px solid var(--tk-border);
+  background: var(--tk-surface);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  position: relative;
+}
+
+.tl-card:hover {
+  border-color: var(--tk-border-strong);
+  background: var(--tk-surface-2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .tl-card:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.1);
+}
+
+/* "New tree" card variant */
+.tl-card-new {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 100px;
+  color: var(--tk-text-muted);
+  border-style: dashed;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.tl-card-new:hover {
+  color: var(--tk-text);
+}
+
+/* Template card variant */
+.tl-card-template {
+  opacity: 0.9;
+}
+
+.tl-card-template:hover {
+  opacity: 1;
+}
+
+/* Card icon */
+.tl-card-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+/* Card body */
+.tl-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-card-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--tk-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-card-desc {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--tk-text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Delete icon — shown on hover */
+.tl-card-delete {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  color: var(--tk-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.tl-card:hover .tl-card-delete {
+  opacity: 1;
+}
+
+.tl-card-delete:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+/* Section label above templates */
+.tl-section-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tk-text-muted);
+  margin: 0 0 0.6rem;
+}
+
+/* Loading shimmer row */
+.tl-loading {
+  font-size: 0.88rem;
+  color: var(--tk-text-muted);
+  padding: 2rem 0;
+  text-align: center;
+}
+
+/* Icon picker in create modal */
+.tl-icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.45rem;
+}
+
+.tl-icon-opt {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  background: var(--tk-surface-2);
+  border: 1px solid var(--tk-border);
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.1s ease;
+}
+
+.tl-icon-opt:hover {
+  border-color: var(--tk-border-strong);
+  background: var(--tk-surface-hover);
+  transform: scale(1.1);
+}
+
+.tl-icon-opt-active {
+  border-color: var(--tk-accent);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 2px var(--tk-accent);
+}
+
+[data-theme="light"] .tl-icon-opt-active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+}
+
+/* Empty state — trees list */
+.tl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.tl-empty-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+  opacity: 0.6;
+}
+
+.tl-empty h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--tk-text);
+}
+
+.tl-empty p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--tk-text-muted);
+  max-width: 320px;
+}
+
+/* ── AI Tree Generation — create wizard UI ─────────────────────────────────── */
+
+/* Large goal input inside the modal */
+.tl-goal-input {
+  width: 100%;
+  font-size: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--tk-border);
+  background: var(--tk-surface);
+  color: var(--tk-text);
+  margin-top: 0.35rem;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.tl-goal-input:focus {
+  outline: none;
+  border-color: var(--tk-accent);
+}
+
+/* Example career chips */
+.tl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.6rem;
+}
+
+.tl-chip {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--tk-border);
+  background: transparent;
+  color: var(--tk-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.14s, color 0.14s, background 0.14s;
+  white-space: nowrap;
+}
+
+.tl-chip:hover {
+  border-color: var(--tk-accent);
+  color: var(--tk-accent);
+  background: color-mix(in srgb, var(--tk-accent) 8%, transparent);
+}
+
+.tl-chip-active {
+  border-color: var(--tk-accent);
+  color: var(--tk-accent);
+  background: color-mix(in srgb, var(--tk-accent) 12%, transparent);
+  font-weight: 500;
+}
+
+/* Generating state — full modal body replacement */
+.tl-generating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.tl-gen-spinner {
+  color: var(--tk-accent);
+  margin-bottom: 0.25rem;
+  opacity: 0.85;
+}
+
+.tl-gen-label {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tk-text);
+}
+
+.tl-gen-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--tk-text-muted);
+  max-width: 280px;
+}
+
+/* "Create blank instead" / "← Generate with AI instead" link-style button */
+.tl-mode-switch {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--tk-text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.14s;
+  margin-right: auto;
+}
+
+.tl-mode-switch:hover {
+  color: var(--tk-accent);
+}
+
+.tl-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tk-error, #e55) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tk-error, #e55) 30%, transparent);
+  color: var(--tk-error, #e55);
+  font-size: 0.86rem;
+  margin-bottom: 0.5rem;
+}
+
+.tl-error-banner span {
+  flex: 1;
+}
+
+.tl-error-dismiss {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: opacity 0.12s;
+}
+
+.tl-error-dismiss:hover {
+  opacity: 1;
+}
+
+/* Light mode overrides */
+[data-theme="light"] .tl-goal-input {
+  background: #fff;
+}
+
+[data-theme="light"] .tl-chip {
+  border-color: #d8dde6;
+  color: #6b7280;
+}
+
+[data-theme="light"] .tl-chip:hover,
+[data-theme="light"] .tl-chip-active {
+  border-color: var(--tk-accent);
+  color: var(--tk-accent);
+}
+
 /* ── Multi-language Code Block Editor ─────────────────────────────────────── */
 
 .tr-code-blocks-list {
@@ -3112,12 +3503,20 @@ code {
   width: min(480px, 96vw);
 }
 
+/* Generate-tree modal — auto-height to fit step list, no scrolling */
+.tr-modal--generate {
+  width: min(520px, 96vw);
+  height: auto;
+  min-height: unset;
+  max-height: calc(100dvh - 3rem);
+}
+
 /* Dialog modal (add subject / add concept) — fixed 350px */
 .tr-modal--dialog {
   width: min(520px, 96vw);
-  height: min(280px, calc(100dvh - 3rem));
+  height: min(400px, calc(100dvh - 3rem));
   min-height: unset;
-  max-height: min(280px, calc(100dvh - 3rem));
+  max-height: min(400px, calc(100dvh - 3rem));
 }
 
 /* Project modal — fixed 1000px */
@@ -3700,4 +4099,147 @@ code {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 16px 16px 32px;
+}
+
+/* ── Generation Progress ─────────────────────────────────────────────── */
+
+.gp-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.gp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gp-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.gp-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tk-text);
+}
+
+.gp-subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  color: var(--tk-text-muted);
+}
+
+.gp-pct {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--tk-accent);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* Progress bar */
+.gp-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--tk-border, #e2e2e2);
+  overflow: hidden;
+}
+
+.gp-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--tk-accent);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Step list */
+.gp-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.gp-step {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  transition: background 0.2s, opacity 0.3s;
+}
+
+.gp-step--in-progress {
+  background: color-mix(in srgb, var(--tk-accent) 8%, transparent);
+}
+
+.gp-step--completed {
+  opacity: 0.7;
+}
+
+.gp-step--pending {
+  opacity: 0.5;
+}
+
+.gp-step--skipped {
+  opacity: 0.4;
+}
+
+/* Step icons */
+.gp-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.25s, color 0.25s;
+}
+
+.gp-icon--done {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #22c55e;
+}
+
+.gp-icon--active {
+  background: color-mix(in srgb, var(--tk-accent) 14%, transparent);
+  color: var(--tk-accent);
+}
+
+.gp-icon--pending {
+  background: color-mix(in srgb, var(--tk-text-muted) 10%, transparent);
+  color: var(--tk-text-muted);
+}
+
+.gp-icon--skipped {
+  background: color-mix(in srgb, var(--tk-text-muted) 8%, transparent);
+  color: var(--tk-text-muted);
+}
+
+/* Step text */
+.gp-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.gp-step-title {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--tk-text);
+}
+
+.gp-step-desc {
+  font-size: 0.78rem;
+  color: var(--tk-text-muted);
 }

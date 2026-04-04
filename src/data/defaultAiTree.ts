@@ -1,10 +1,6 @@
-export type SeedTopic = {
-  title: string;
-  summary?: string;
-  children?: SeedTopic[];
-};
+import type { SeedNode } from "../types";
 
-export const defaultAiTree: SeedTopic = {
+export const defaultAiTree: SeedNode = {
   "title": "Artificial Intelligence",
   "summary": "Your full AI learning map.",
   "children": [

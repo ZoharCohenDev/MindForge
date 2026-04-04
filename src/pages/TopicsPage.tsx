@@ -4,6 +4,7 @@ import {
   ArrowRightLeft,
   BookOpen,
   Check,
+  ChevronLeft,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -21,20 +22,22 @@ import {
   X,
 } from "lucide-react";
 import {
-  createTopic,
   createTopicNote,
-  deleteTopic,
-  deleteTopicNote,
-  listTopicNotes,
-  listTopics,
-  seedDefaultAiTree,
-  seedDefaultFullStackTree,
-  toggleTopicDone,
   updateTopicNote,
+  createTree,
+  seedTreeWithSeedNode,
 } from "../lib/dataApi";
-import type { CodeBlock, Note, SubExpression, Topic, TreeType } from "../types";
-
-type TopicNode = Topic & { children: TopicNode[] };
+import { treeService } from "../lib/treeService";
+import { SEED_TREES, getSeedTreeBySlug } from "../data/seedTrees";
+import { useTreeGeneration } from "../lib/useTreeGeneration";
+import { GenerationProgress } from "../components/GenerationProgress";
+import type { CodeBlock, Note, SubExpression, Topic, Tree, TreeNode } from "../types";
+import {
+  sortTreeNodes,
+  calcTreeProgress,
+  makeExpandToDepth,
+} from "../lib/treeUtils";
+import { useTreeEditor } from "../lib/useTreeEditor";
 
 type ModalState =
   | { type: "subject"; topic: Topic }
@@ -44,63 +47,8 @@ type ModalState =
   | { type: "view-notes"; topic: Topic }
   | null;
 
-function buildTree(items: Topic[]) {
-  const map = new Map<string, TopicNode>();
-  const roots: TopicNode[] = [];
-
-  items.forEach((topic) => map.set(topic.id, { ...topic, children: [] }));
-
-  items.forEach((topic) => {
-    const current = map.get(topic.id)!;
-    if (topic.parent_id) {
-      const parent = map.get(topic.parent_id);
-      if (parent) {
-        parent.children.push(current);
-        return;
-      }
-    }
-    roots.push(current);
-  });
-
-  return roots;
-}
-
-function groupNotesByTopic(notes: Note[]) {
-  return notes.reduce<Record<string, Note[]>>((acc, note) => {
-    if (!note.topic_id) return acc;
-    acc[note.topic_id] ??= [];
-    acc[note.topic_id].push(note);
-    return acc;
-  }, {});
-}
-
-function sortNodes(nodes: TopicNode[]) {
-  return [...nodes].sort((a, b) => {
-    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-    return a.title.localeCompare(b.title);
-  });
-}
-
-function calcProgress(node: TopicNode): number {
-  const all: TopicNode[] = [];
-  const walk = (n: TopicNode) => {
-    all.push(n);
-    n.children.forEach(walk);
-  };
-  node.children.forEach(walk);
-  if (all.length === 0) return 0;
-  return Math.round(
-    (all.filter((n) => n.status === "done").length / all.length) * 100,
-  );
-}
 
 
-function makeExpandToDepth(topics: Topic[], maxDepth: number = 1) {
-  // Expand only nodes up to maxDepth (0, 1, 2 = 3 levels shown)
-  return Object.fromEntries(
-    topics.filter((t) => t.depth <= maxDepth).map((t) => [t.id, true])
-  );
-}
 
 function getTopicPath(topicId: string, allTopics: Topic[]): string {
   const map = new Map(allTopics.map((t) => [t.id, t]));
@@ -139,15 +87,37 @@ async function getPyodide(): Promise<any> {
   return _pyodideLoading;
 }
 
+// ── Module-level constants (stable across renders) ─────────────────────────
+const CAREER_EXAMPLES = ['AI Engineer', 'Full Stack Developer', 'Data Scientist', 'DevOps Engineer', 'Cybersecurity Analyst'];
+const TREE_ICON_OPTIONS = ['🌱', '🧠', '💻', '🔬', '🎨', '📚', '⚡', '🚀', '🌍', '🎯', '🤖', '🌐'];
+const CONVERT_LANGS = ['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','SQL','Bash'];
+const PISTON_LANG_MAP = new Set(['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','Bash']);
+
 export function TopicsPage() {
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
-  const [activeTree, setActiveTree] = useState<TreeType>('ai');
+  const [trees, setTrees] = useState<Tree[]>([]);
+  const [activeTree, setActiveTree] = useState<Tree | null>(null);
+  const [view, setView] = useState<'list' | 'open'>('list');
+  const [isLoadingTrees, setIsLoadingTrees] = useState(true);
   const navigate = useNavigate();
   const [isSeeding, setIsSeeding] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tree editor — owns all node/note state for the currently-open tree.
+  const editor = useTreeEditor(activeTree);
+  // Create-tree modal state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<'ai' | 'blank'>('ai');
+  // AI generation flow
+  const [genGoal, setGenGoal] = useState('');
+  const gen = useTreeGeneration();
+  // Blank create flow
+  const [newTreeName, setNewTreeName] = useState('');
+  const [newTreeDesc, setNewTreeDesc] = useState('');
+  const [newTreeIcon, setNewTreeIcon] = useState('\uD83C\uDF31');
+  const [isCreatingTree, setIsCreatingTree] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  // Confirm-delete tree
+  const [confirmDeleteTreeId, setConfirmDeleteTreeId] = useState<string | null>(null);
 
   const [modal, setModal] = useState<ModalState>(null);
   const [childTitle, setChildTitle] = useState("");
@@ -178,53 +148,21 @@ export function TopicsPage() {
     | null
   >(null);
 
-  const refresh = async (tree?: TreeType, preserveExpanded = false) => {
-    const treeType = tree ?? activeTree;
-    setIsRefreshing(true);
-    setError(null);
-    try {
-      const [topicRows, noteRows] = await Promise.all([
-        listTopics(treeType),
-        listTopicNotes(),
-      ]);
-      setTopics(topicRows);
-      setNotes(noteRows);
-      if (!preserveExpanded) {
-        setExpandedIds(makeExpandToDepth(topicRows));
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Could not load the tree.");
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
+  // Load trees once on mount. Do not auto-open — show the list view first.
   useEffect(() => {
-    void refresh();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTree]);
-
-  const tree = useMemo(() => buildTree(topics), [topics]);
-  const notesByTopic = useMemo(() => groupNotesByTopic(notes), [notes]);
-
-  /** IDs of every topic that appears in the Knowledge Graph (done + all their ancestors). */
-  const inGraphIds = useMemo<Set<string>>(() => {
-    const topicMap = new Map(topics.map(t => [t.id, t]));
-    const doneSet  = new Set(topics.filter(t => t.status === 'done').map(t => t.id));
-    const included = new Set<string>();
-    doneSet.forEach(id => {
-      let cur: Topic | undefined = topicMap.get(id);
-      while (cur) {
-        included.add(cur.id);
-        cur = cur.parent_id ? topicMap.get(cur.parent_id) : undefined;
+    void (async () => {
+      try {
+        const treeRows = await treeService.getAll();
+        setTrees(treeRows);
+      } catch (err) {
+        console.error(err);
+        setError('Could not load your trees.');
+      } finally {
+        setIsLoadingTrees(false);
       }
-    });
-    return included;
-  }, [topics]);
-
-  const toggleExpanded = (id: string) =>
-    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openSubjectModal = (topic: Topic) => {
     setModal({ type: "subject", topic });
@@ -309,18 +247,128 @@ export function TopicsPage() {
   };
 
   const handleSeed = async () => {
+    if (!activeTree) return;
+    setIsSeeding(true);
+    editor.setEditorError(null);
+    try {
+      const seededTree = await treeService.seedFromTemplate(activeTree.slug);
+      setTrees(prev => prev.map(t => t.id === seededTree.id ? seededTree : t));
+      setActiveTree(seededTree);
+      // Force topic reload; tree id is unchanged so closure activeTree.id works.
+      await editor.refresh();
+    } catch (err) {
+      console.error(err);
+      editor.setEditorError(`Could not seed the ${activeTree.name} tree.`);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  // ── Tree list view handlers ───────────────────────────────────────────────
+
+  const handleOpenTree = (tree: Tree) => {
+    setActiveTree(tree);
+    setView('open');
+  };
+
+  const handleBackToList = () => {
+    setView('list');
+    setActiveTree(null);
+    // editor clears its own topics/notes when activeTree becomes null.
+  };
+
+  const openCreateModal = () => {
+    setCreateMode('ai');
+    setGenGoal('');
+    gen.reset();
+    setNewTreeName('');
+    setNewTreeDesc('');
+    setNewTreeIcon('\uD83C\uDF31');
+    setCreateError(null);
+    setCreateOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    if (gen.phase === 'generating') return; // block close while generating
+    gen.reset();
+    setCreateOpen(false);
+  };
+
+  const handleGenerateTree = async () => {
+    const goal = genGoal.trim();
+    if (!goal) return;
+    try {
+      const payload = await gen.generate(goal);
+      if (!payload) return; // aborted
+      const tree = await createTree({
+        name: payload.name,
+        description: payload.description,
+        icon: payload.icon,
+      });
+      await seedTreeWithSeedNode(tree.id, tree.slug, payload.tree);
+      setTrees(prev => [...prev, tree]);
+      setCreateOpen(false);
+      gen.reset();
+      handleOpenTree(tree);
+    } catch (err) {
+      console.error(err);
+      // gen.phase is already 'error' from the hook
+    }
+  };
+
+  const handleCreateTree = async () => {
+    const name = newTreeName.trim();
+    if (!name) return;
+    setIsCreatingTree(true);
+    setCreateError(null);
+    try {
+      const tree = await treeService.create({
+        name,
+        description: newTreeDesc.trim() || undefined,
+        icon: newTreeIcon,
+      });
+      setTrees(prev => [...prev, tree]);
+      setCreateOpen(false);
+      setNewTreeName('');
+      setNewTreeDesc('');
+      setNewTreeIcon('\uD83C\uDF31');
+      handleOpenTree(tree);
+    } catch (err) {
+      console.error(err);
+      setCreateError('Could not create tree. Please try again.');
+    } finally {
+      setIsCreatingTree(false);
+    }
+  };
+
+  const handleDeleteTree = async (treeId: string) => {
+    setError(null);
+    try {
+      await treeService.delete(treeId);
+      setTrees(prev => prev.filter(t => t.id !== treeId));
+      setConfirmDeleteTreeId(null);
+    } catch (err) {
+      console.error(err);
+      setError('Could not delete tree.');
+    }
+  };
+
+  const handleSeedTemplate = async (slug: string) => {
     setIsSeeding(true);
     setError(null);
     try {
-      if (activeTree === 'ai') {
-        await seedDefaultAiTree();
-      } else {
-        await seedDefaultFullStackTree();
-      }
-      await refresh();
+      const seededTree = await treeService.seedFromTemplate(slug);
+      // Upsert the returned tree in local state without a round-trip re-fetch.
+      setTrees(prev => {
+        const exists = prev.some(t => t.id === seededTree.id);
+        return exists
+          ? prev.map(t => t.id === seededTree.id ? seededTree : t)
+          : [...prev, seededTree];
+      });
+      handleOpenTree(seededTree);
     } catch (err) {
       console.error(err);
-      setError(`Could not seed the ${activeTree === 'ai' ? 'AI' : 'Full Stack'} tree.`);
+      setError(`Could not load the ${slug} template.`);
     } finally {
       setIsSeeding(false);
     }
@@ -329,24 +377,17 @@ export function TopicsPage() {
   const handleSaveModal = async () => {
     if (!modal) return;
     setIsSavingModal(true);
-    setError(null);
+    editor.setEditorError(null);
     try {
       if (modal.type === "subject" || modal.type === "concept") {
         const title = childTitle.trim();
         if (!title) return;
-        const siblingCount = topics.filter(
-          (t) => t.parent_id === modal.topic.id,
-        ).length;
-        await createTopic({
-          title,
-          summary: "",
-          parent_id: modal.topic.id,
-          depth: modal.topic.depth + 1,
-          sort_order: siblingCount,
-          status: "not_started",
-          tree_type: activeTree,
-        });
-        setExpandedIds((prev) => ({ ...prev, [modal.topic.id]: true }));
+        if (!activeTree) return;
+        await editor.addChild(modal.topic, title, activeTree.slug, activeTree.id);
+        // addChild expands the parent; refresh after to load the new node.
+        closeModal();
+        await editor.refresh(true);
+        return;
       }
       if (modal.type === "note") {
         const content = noteContent.trim();
@@ -359,7 +400,7 @@ export function TopicsPage() {
           showMathBlock && noteMath.trim() ? noteMath.trim() : undefined,
           subExpressions.length > 0 ? subExpressions : undefined,
         );
-        setExpandedIds((prev) => ({ ...prev, [modal.topic.id]: true }));
+        editor.setExpandedIds((prev) => ({ ...prev, [modal.topic.id]: true }));
       }
       if (modal.type === "edit-note") {
         const content = noteContent.trim();
@@ -373,10 +414,10 @@ export function TopicsPage() {
         });
       }
       closeModal();
-      await refresh(undefined, true);
+      await editor.refresh(true);
     } catch (err) {
       console.error(err);
-      setError("Could not save your change.");
+      editor.setEditorError("Could not save your change.");
     } finally {
       setIsSavingModal(false);
     }
@@ -387,7 +428,7 @@ export function TopicsPage() {
     setIsGenerating(true);
     setAiError(null);
     try {
-      const topicPath = getTopicPath(modal.topic.id, topics);
+      const topicPath = getTopicPath(modal.topic.id, editor.topics);
       const response = await fetch('/api/generate-explanation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -417,12 +458,6 @@ export function TopicsPage() {
       setIsGenerating(false);
     }
   };
-
-  const CONVERT_LANGS = ['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','SQL','Bash'];
-
-  const PISTON_LANG_MAP = new Set([
-    'Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','Bash',
-  ]);
 
   const handleRunCode = async (idx: number) => {
     const block = codeBlocks[idx];
@@ -553,85 +588,43 @@ except ImportError:
     }
   };
 
-  const handleDeleteNote = async (noteId: string) => {
-    try {
-      await deleteTopicNote(noteId);
-      await refresh(undefined, true);
-    } catch (err) {
-      console.error(err);
-      setError("Could not delete the explanation.");
-    }
-  };
-
-  const handleDeleteTopic = async (topicId: string) => {
-    try {
-      await deleteTopic(topicId);
-      await refresh();
-    } catch (err) {
-      console.error(err);
-      setError("Could not delete the topic.");
-    }
-  };
-
   const handleConfirmDelete = async () => {
     if (!confirmDelete) return;
     try {
       if (confirmDelete.kind === 'topic') {
-        await handleDeleteTopic(confirmDelete.id);
+        await editor.deleteNode(confirmDelete.id);
       } else {
-        await handleDeleteNote(confirmDelete.id);
+        await editor.deleteNote(confirmDelete.id);
       }
     } finally {
       setConfirmDelete(null);
     }
   };
 
-  // Optimistic toggle — flips local state immediately, syncs to DB in background.
-  const handleToggleDone = (node: TopicNode) => {
-    const next = node.status === "done" ? "not_started" : "done";
-    setTopics((prev) =>
-      prev.map((t) => (t.id === node.id ? { ...t, status: next } : t)),
-    );
-    void toggleTopicDone(node).catch((err) => {
-      console.error(err);
-      // Revert on failure
-      setTopics((prev) =>
-        prev.map((t) => (t.id === node.id ? { ...t, status: node.status } : t)),
-      );
-    });
-  };
-
-  const leafTopics = useMemo(() => {
-    const parentIds = new Set(topics.map(t => t.parent_id).filter(Boolean));
-    return topics.filter(t => !parentIds.has(t.id));
-  }, [topics]);
+  const leafTopics = editor.leafTopics;
 
   const isModalTopicLeaf = useMemo(() => {
     if (!modal || (modal.type !== 'note' && modal.type !== 'edit-note')) return false;
-    return !topics.some((t) => t.parent_id === modal.topic.id);
-  }, [modal, topics]);
+    return !editor.topics.some((t) => t.parent_id === modal.topic.id);
+  }, [modal, editor.topics]);
 
   const doneCount = leafTopics.filter((t) => t.status === "done").length;
-  const overallProgress =
-    leafTopics.length > 0
-      ? Math.round((doneCount / leafTopics.length) * 100)
-      : 0;
 
   // Two-panel notes viewer helpers
   const viewNotesList =
-    modal?.type === "view-notes" ? (notesByTopic[modal.topic.id] ?? []) : [];
+    modal?.type === "view-notes" ? (editor.notesByTopic[modal.topic.id] ?? []) : [];
   const activeNote =
     viewNotesList.find((n) => n.id === selectedNoteId) ??
     viewNotesList[0] ??
     null;
 
-  const renderNode = (node: TopicNode, depth = 0): React.ReactNode => {
-    const isExpanded = !!expandedIds[node.id];
-    const children = sortNodes(node.children);
+  const renderNode = (node: TreeNode, depth = 0): React.ReactNode => {
+    const isExpanded = !!editor.expandedIds[node.id];
+    const children = sortTreeNodes(node.children);
     const hasChildren = children.length > 0;
     const isDone = node.status === "done";
-    const progress = hasChildren ? calcProgress(node) : null;
-    const topicNotes = notesByTopic[node.id] ?? [];
+    const progress = hasChildren ? calcTreeProgress(node) : null;
+    const topicNotes = editor.notesByTopic[node.id] ?? [];
 
     return (
       <div key={node.id} className="tr-group">
@@ -646,7 +639,7 @@ except ImportError:
           <button
             type="button"
             className={`tr-chevron${!hasChildren ? " tr-chevron-hidden" : ""}${isExpanded ? " tr-chevron-open" : ""}`}
-            onClick={() => hasChildren && toggleExpanded(node.id)}
+            onClick={() => hasChildren && editor.toggleExpanded(node.id)}
             aria-label={isExpanded ? "Collapse" : "Expand"}
             tabIndex={hasChildren ? 0 : -1}
           >
@@ -658,7 +651,7 @@ except ImportError:
             <button
               type="button"
               className={`tr-check${isDone ? " tr-check-done" : ""}`}
-              onClick={() => handleToggleDone(node)}
+              onClick={() => editor.toggleDone(node)}
               aria-label={isDone ? "Mark as not done" : "Mark as done"}
             >
               {isDone && <Check size={10} strokeWidth={3} />}
@@ -668,10 +661,10 @@ except ImportError:
           {/* Title — click to jump to Knowledge Graph (only for nodes already on the graph) */}
           <button
             type="button"
-            className={`tr-title${isDone ? " tr-title-done" : ""}${depth === 0 ? " tr-title-root" : depth === 1 ? " tr-title-l1" : ""}${inGraphIds.has(node.id) ? " tr-title-in-graph" : ""}`}
-            onClick={inGraphIds.has(node.id) ? () => navigate(`/graph?focus=${node.id}`) : undefined}
-            style={{ cursor: inGraphIds.has(node.id) ? 'pointer' : 'default' }}
-            title={inGraphIds.has(node.id) ? "Open in Knowledge Graph" : undefined}
+            className={`tr-title${isDone ? " tr-title-done" : ""}${depth === 0 ? " tr-title-root" : depth === 1 ? " tr-title-l1" : ""}${editor.inGraphIds.has(node.id) ? " tr-title-in-graph" : ""}`}
+            onClick={editor.inGraphIds.has(node.id) ? () => navigate(`/graph?focus=${node.id}`) : undefined}
+            style={{ cursor: editor.inGraphIds.has(node.id) ? 'pointer' : 'default' }}
+            title={editor.inGraphIds.has(node.id) ? "Open in Knowledge Graph" : undefined}
           >
             {node.title}
           </button>
@@ -758,42 +751,315 @@ except ImportError:
     );
   };
 
+  // ── List view ───────────────────────────────────────────────────────────────────
+  if (view === 'list') {
+    return (
+      <div className="page-stack">
+        {/* Header */}
+        <div className="tr-page-bar">
+          <div className="tr-page-bar-left">
+            <h2>My Trees</h2>
+            <p>Select a tree to open it, or create a new one</p>
+          </div>
+          <div className="tr-page-bar-right">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={openCreateModal}
+            >
+              <Plus size={14} style={{ marginRight: '4px' }} />
+              New Tree
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="tl-error-banner">
+            <span>{error}</span>
+            <button type="button" className="tl-error-dismiss" onClick={() => setError(null)} aria-label="Dismiss">
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
+        {/* Tree cards */}
+        {isLoadingTrees ? (
+          <p className="tl-loading">Loading your trees…</p>
+        ) : trees.length === 0 ? (
+          <section className="glass-card">
+            <div className="tl-empty">
+              <div className="tl-empty-icon">🌳</div>
+              <h3>No trees yet</h3>
+              <p>Generate a tree with AI, or start from a template below.</p>
+            </div>
+          </section>
+        ) : (
+          <div className="tl-grid">
+            {trees.map((tree) => (
+              <button
+                key={tree.id}
+                type="button"
+                className="tl-card"
+                onClick={() => handleOpenTree(tree)}
+              >
+                <div className="tl-card-icon">{tree.icon ?? '🌳'}</div>
+                <div className="tl-card-body">
+                  <div className="tl-card-name">{tree.name}</div>
+                  {tree.description && (
+                    <div className="tl-card-desc">{tree.description}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="tl-card-delete"
+                  title="Delete tree"
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteTreeId(tree.id); }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="tl-card tl-card-new"
+              onClick={openCreateModal}
+            >
+              <Plus size={18} />
+              <span>New Tree</span>
+            </button>
+          </div>
+        )}
+
+        {/* Templates — always visible so user can add more */}
+        <div>
+          <p className="tl-section-label">Start from a template</p>
+          <div className="tl-grid">
+            {SEED_TREES.map((def) => (
+              <button
+                key={def.slug}
+                type="button"
+                className="tl-card tl-card-template"
+                onClick={() => void handleSeedTemplate(def.slug)}
+                disabled={isSeeding}
+              >
+                <div className="tl-card-icon">{def.icon}</div>
+                <div className="tl-card-body">
+                  <div className="tl-card-name">{def.name}</div>
+                  <div className="tl-card-desc">{def.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Create tree modal */}
+        {createOpen && (
+          <div className="tr-backdrop" onClick={closeCreateModal}>
+            <div
+              className={`tr-modal ${
+                gen.phase === 'generating' || gen.phase === 'done'
+                  ? 'tr-modal--generate'
+                  : 'tr-modal--dialog'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="tr-modal-header">
+                <div className="tr-modal-icon">
+                  {createMode === 'ai' && (gen.phase === 'generating' || gen.phase === 'done')
+                    ? <RefreshCw size={15} className="spin" />
+                    : createMode === 'ai'
+                      ? <Sparkles size={15} />
+                      : <Plus size={15} />}
+                </div>
+                <div className="tr-modal-title-block">
+                  <strong>
+                    {createMode === 'ai' && gen.phase === 'done'
+                      ? 'Saving tree…'
+                      : createMode === 'ai' && gen.phase === 'generating'
+                        ? 'Generating…'
+                        : createMode === 'ai'
+                          ? 'Generate Learning Tree'
+                          : 'Create Blank Tree'}
+                  </strong>
+                  <p className="tr-modal-parent">
+                    {createMode === 'ai' && (gen.phase === 'generating' || gen.phase === 'done')
+                      ? `Building roadmap for "${genGoal}"…`
+                      : createMode === 'ai'
+                        ? 'AI will build a personalised learning roadmap'
+                        : 'Give your learning tree a name'}
+                  </p>
+                </div>
+                {gen.phase !== 'generating' && gen.phase !== 'done' && (
+                  <button type="button" className="tr-modal-close" onClick={closeCreateModal}>
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+
+              {/* ── AI generation step ── */}
+              {createMode === 'ai' && (gen.phase === 'idle' || gen.phase === 'error') && (
+                <>
+                  <div className="tr-modal-body">
+                    <label>
+                      What do you want to become?
+                      <input
+                        className="tl-goal-input"
+                        value={genGoal}
+                        onChange={(e) => setGenGoal(e.target.value)}
+                        placeholder="e.g. AI Engineer, Data Scientist…"
+                        autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && void handleGenerateTree()}
+                      />
+                    </label>
+                    <div className="tl-chips">
+                      {CAREER_EXAMPLES.map((ex) => (
+                        <button
+                          key={ex}
+                          type="button"
+                          className={`tl-chip${genGoal === ex ? ' tl-chip-active' : ''}`}
+                          onClick={() => setGenGoal(ex)}
+                        >
+                          {ex}
+                        </button>
+                      ))}
+                    </div>
+                    {gen.error && <div className="tl-error-banner"><span>{gen.error}</span></div>}
+                  </div>
+                  <div className="tr-modal-actions">
+                    <button
+                      type="button"
+                      className="tl-mode-switch"
+                      onClick={() => setCreateMode('blank')}
+                    >
+                      Create blank instead
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => void handleGenerateTree()}
+                      disabled={!genGoal.trim()}
+                    >
+                      <Sparkles size={14} style={{ marginRight: '4px' }} />
+                      Generate Tree
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ── Generating / Done progress ── */}
+              {createMode === 'ai' && (gen.phase === 'generating' || gen.phase === 'done') && (
+                <div className="tr-modal-body">
+                  <GenerationProgress steps={gen.steps} role={genGoal} />
+                  {gen.phase === 'done' && (
+                    <p className="tl-gen-sub" style={{ textAlign: 'center', marginTop: '0.25rem' }}>
+                      Saving your tree to the database…
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* ── Blank create form ── */}
+              {createMode === 'blank' && (
+                <>
+                  <div className="tr-modal-body">
+                    <label>
+                      Name
+                      <input
+                        value={newTreeName}
+                        onChange={(e) => setNewTreeName(e.target.value)}
+                        placeholder="e.g. Machine Learning"
+                        autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && void handleCreateTree()}
+                      />
+                    </label>
+                    <label>
+                      Description <span style={{ opacity: 0.5 }}>(optional)</span>
+                      <input
+                        value={newTreeDesc}
+                        onChange={(e) => setNewTreeDesc(e.target.value)}
+                        placeholder="What will you learn?"
+                      />
+                    </label>
+                    <div>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--tk-text-muted)', display: 'block', marginBottom: '0.45rem' }}>Icon</span>
+                      <div className="tl-icon-picker">
+                        {TREE_ICON_OPTIONS.map((icon) => (
+                          <button
+                            key={icon}
+                            type="button"
+                            className={`tl-icon-opt${newTreeIcon === icon ? ' tl-icon-opt-active' : ''}`}
+                            onClick={() => setNewTreeIcon(icon)}
+                          >
+                            {icon}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {createError && <p className="form-message">{createError}</p>}
+                  </div>
+                  <div className="tr-modal-actions">
+                    <button type="button" className="tl-mode-switch" onClick={() => setCreateMode('ai')}>
+                      ← Generate with AI instead
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => void handleCreateTree()}
+                      disabled={!newTreeName.trim() || isCreatingTree}
+                    >
+                      {isCreatingTree ? 'Creating…' : 'Create Tree'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Confirm delete tree */}
+        {confirmDeleteTreeId && (
+          <div className="tr-backdrop tr-confirm-backdrop" onClick={() => setConfirmDeleteTreeId(null)}>
+            <div className="tr-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="tr-confirm-icon"><Trash2 size={20} /></div>
+              <p className="tr-confirm-text">
+                Delete <strong>"{trees.find(t => t.id === confirmDeleteTreeId)?.name ?? 'this tree'}"</strong>?
+                <br /><span style={{ fontSize: '0.82rem', opacity: 0.7 }}>All topics inside will be permanently removed.</span>
+              </p>
+              <div className="tr-confirm-actions">
+                <button type="button" className="secondary-button" onClick={() => setConfirmDeleteTreeId(null)}>Cancel</button>
+                <button type="button" className="danger-button" onClick={() => void handleDeleteTree(confirmDeleteTreeId)}>Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Open (editor) view ──────────────────────────────────────────────────────────────
+  const hasSeedTemplate = activeTree ? !!getSeedTreeBySlug(activeTree.slug) : false;
+
   return (
     <div className="page-stack">
       {/* Page header bar */}
       <div className="tr-page-bar">
         <div className="tr-page-bar-left">
-          <h2>{activeTree === 'ai' ? 'AI Roadmap' : 'Full Stack Roadmap'}</h2>
+          <button type="button" className="tr-back-btn" onClick={handleBackToList}>
+            <ChevronLeft size={14} />
+            My Trees
+          </button>
+          <h2>{activeTree?.name ?? 'Tree'}</h2>
           <p>Check off topics as you master them</p>
         </div>
-        <div className="tr-page-bar-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Tree switcher */}
-          <div className="tr-tree-switcher">
-            <button
-              type="button"
-              className={`tr-tree-tab${activeTree === 'ai' ? ' tr-tree-tab-active' : ''}`}
-              onClick={() => { setActiveTree('ai'); setTopics([]); setNotes([]); }}
-            >
-              <span className="tr-tree-tab-icon">🤖</span>
-              AI Tree
-            </button>
-            <button
-              type="button"
-              className={`tr-tree-tab${activeTree === 'fullstack' ? ' tr-tree-tab-active' : ''}`}
-              onClick={() => { setActiveTree('fullstack'); setTopics([]); setNotes([]); }}
-            >
-              <span className="tr-tree-tab-icon">🌐</span>
-              Full Stack
-            </button>
-          </div>
-          {topics.length === 0 && (
+        <div className="tr-page-bar-right">
+          {editor.topics.length === 0 && activeTree && hasSeedTemplate && (
             <button
               className="primary-button"
               type="button"
               onClick={() => void handleSeed()}
               disabled={isSeeding}
             >
-              {isSeeding ? 'Seeding…' : `Seed ${activeTree === 'ai' ? 'AI' : 'Full Stack'} tree`}
+              {isSeeding ? 'Seeding…' : `Load ${activeTree.name} template`}
             </button>
           )}
         </div>
@@ -803,10 +1069,10 @@ except ImportError:
       <div className="tr-cmd-bar">
         <div className="tr-cmd-progress">
           <div className="tr-cmd-track">
-            <div className="tr-cmd-fill" style={{ width: `${overallProgress}%` }} />
+            <div className="tr-cmd-fill" style={{ width: `${editor.overallProgress}%` }} />
           </div>
           <span className="tr-cmd-label">
-            {doneCount}&thinsp;/&thinsp;{leafTopics.length}&nbsp;&nbsp;{overallProgress}%
+            {doneCount}&thinsp;/&thinsp;{leafTopics.length}&nbsp;&nbsp;{editor.overallProgress}%
           </span>
         </div>
 
@@ -816,8 +1082,8 @@ except ImportError:
           <button
             type="button"
             className="tr-cmd-btn"
-            onClick={() => setExpandedIds(makeExpandToDepth(topics))}
-            disabled={topics.length === 0}
+            onClick={() => editor.setExpandedIds(makeExpandToDepth(editor.topics))}
+            disabled={editor.topics.length === 0}
             title="Expand all"
           >
             <ChevronsUpDown size={13} />
@@ -827,8 +1093,8 @@ except ImportError:
           <button
             type="button"
             className="tr-cmd-btn"
-            onClick={() => setExpandedIds({})}
-            disabled={topics.length === 0}
+            onClick={() => editor.setExpandedIds({})}
+            disabled={editor.topics.length === 0}
             title="Collapse all"
           >
             <ChevronsDownUp size={13} />
@@ -838,30 +1104,37 @@ except ImportError:
           <button
             type="button"
             className="tr-cmd-btn"
-            onClick={() => void refresh()}
-            disabled={isRefreshing}
+            onClick={() => void editor.refresh()}
+            disabled={editor.isRefreshing}
             title="Refresh"
           >
-            <RefreshCw size={13} className={isRefreshing ? "spin" : ""} />
+            <RefreshCw size={13} className={editor.isRefreshing ? "spin" : ""} />
           </button>
         </div>
       </div>
 
-      {error && <p className="form-message">{error}</p>}
+      {error && (
+        <div className="tl-error-banner">
+          <span>{error}</span>
+          <button type="button" className="tl-error-dismiss" onClick={() => setError(null)} aria-label="Dismiss">
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       {/* Tree */}
-      {topics.length === 0 ? (
+      {editor.topics.length === 0 ? (
         <section className="glass-card empty-state-card">
           <h3>No topics yet</h3>
           <p>
-            {activeTree === 'ai'
-              ? 'Click "Seed AI tree" above to load your full AI learning roadmap — 214 topics across 6 depths.'
-              : 'Click "Seed Full Stack tree" above to load your Full Stack learning roadmap.'}
+            {hasSeedTemplate
+              ? `Click “Load ${activeTree?.name} template” above to populate this tree.`
+              : 'This tree is empty. Add subjects and concepts to get started.'}
           </p>
         </section>
       ) : (
         <section className="glass-card tr-shell">
-          {sortNodes(tree).map((node) => renderNode(node, 0))}
+          {sortTreeNodes(editor.treeNodes).map((node) => renderNode(node, 0))}
         </section>
       )}
 
