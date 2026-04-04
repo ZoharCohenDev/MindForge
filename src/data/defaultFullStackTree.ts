@@ -1,6 +1,6 @@
 import type { SeedNode } from "../types";
 
-export const defaultFullStackTree: SeedTopic = {
+export const defaultFullStackTree: SeedNode = {
   title: "Full Stack Development",
   summary: "The complete Full Stack learning tree.",
   children: [
