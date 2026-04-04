@@ -13,6 +13,7 @@ import {
   Lightbulb,
   NotebookPen,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   Sparkles,
@@ -141,6 +142,9 @@ export function TopicsPage() {
   const [convertingIdx, setConvertingIdx] = useState<number | null>(null);
   const [convertTargets, setConvertTargets] = useState<Record<number, string>>({});
   const [convertErrors, setConvertErrors] = useState<Record<number, string>>({});
+  // Per-block run state
+  const [runningIdx, setRunningIdx] = useState<number | null>(null);
+  const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number }>>({});
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -258,6 +262,8 @@ export function TopicsPage() {
     setConvertingIdx(null);
     setConvertTargets({});
     setConvertErrors({});
+    setRunningIdx(null);
+    setBlockOutputs({});
   };
 
   const insertMathSymbol = (symbol: string) => {
@@ -385,6 +391,54 @@ export function TopicsPage() {
   };
 
   const CONVERT_LANGS = ['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','SQL','Bash'];
+
+  const PISTON_LANG_MAP: Record<string, { language: string; version: string }> = {
+    'Python':     { language: 'python',     version: '3.10.0' },
+    'JavaScript': { language: 'javascript', version: '18.15.0' },
+    'TypeScript': { language: 'typescript', version: '5.0.3' },
+    'Java':       { language: 'java',       version: '15.0.2' },
+    'C++':        { language: 'c++',        version: '10.2.0' },
+    'C#':         { language: 'csharp',     version: '6.12.0' },
+    'Go':         { language: 'go',         version: '1.16.2' },
+    'Rust':       { language: 'rust',       version: '1.50.0' },
+    'Bash':       { language: 'bash',       version: '5.1.0' },
+  };
+
+  const handleRunCode = async (idx: number) => {
+    const block = codeBlocks[idx];
+    if (!block?.code.trim()) return;
+    const lang = PISTON_LANG_MAP[block.language];
+    if (!lang) return;
+    setRunningIdx(idx);
+    setBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; });
+    try {
+      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: lang.language,
+          version: lang.version,
+          files: [{ content: block.code }],
+        }),
+      });
+      if (!resp.ok) throw new Error(`Piston error ${resp.status}`);
+      const data = await resp.json() as { run: { stdout: string; stderr: string; code: number } };
+      setBlockOutputs(prev => ({
+        ...prev,
+        [idx]: {
+          stdout: data.run.stdout ?? '',
+          stderr: data.run.stderr ?? '',
+          exitCode: data.run.code ?? 0,
+        },
+      }));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Execution failed';
+      setBlockOutputs(prev => ({ ...prev, [idx]: { stdout: '', stderr: msg, exitCode: 1 } }));
+      console.error('[run-code]', err);
+    } finally {
+      setRunningIdx(null);
+    }
+  };
 
   const handleConvertCode = async (idx: number) => {
     const block = codeBlocks[idx];
@@ -907,6 +961,40 @@ export function TopicsPage() {
                             placeholder={`// ${block.language} code here…`}
                             spellCheck={false}
                           />
+                          {/* Run output */}
+                          {blockOutputs[idx] !== undefined && (
+                            <div className="cb-output">
+                              <div className="cb-output-header">
+                                <span className={`cb-output-status ${blockOutputs[idx].exitCode === 0 ? 'cb-output-status--ok' : 'cb-output-status--err'}`}>
+                                  {blockOutputs[idx].exitCode === 0 ? '✓ exit 0' : `✗ exit ${blockOutputs[idx].exitCode}`}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="cb-output-clear"
+                                  onClick={() => setBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; })}
+                                  title="Clear output"
+                                >
+                                  <X size={11} />
+                                </button>
+                              </div>
+                              <pre className="cb-output-pre">
+                                {(blockOutputs[idx].stdout + blockOutputs[idx].stderr).trimEnd() || '(no output)'}
+                              </pre>
+                            </div>
+                          )}
+                          {/* Run button — only for executable languages */}
+                          {PISTON_LANG_MAP[block.language] && (
+                            <button
+                              type="button"
+                              className="cb-run-btn"
+                              onClick={() => void handleRunCode(idx)}
+                              disabled={runningIdx === idx || !block.code.trim()}
+                              title={`Run ${block.language} code`}
+                            >
+                              <Play size={11} />
+                              {runningIdx === idx ? 'Running…' : 'Run'}
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>

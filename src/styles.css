@@ -2250,6 +2250,86 @@ code {
   color: #f87171;
 }
 
+/* ── Code block — Run & Output ──────────────────── */
+
+.cb-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 10px 8px;
+  padding: 4px 12px;
+  border-radius: 5px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.08);
+  color: #34d399;
+  cursor: pointer;
+  transition: background 0.13s ease, opacity 0.13s ease;
+}
+
+.cb-run-btn:hover:not(:disabled) {
+  background: rgba(52, 211, 153, 0.18);
+}
+
+.cb-run-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cb-output {
+  border-top: 1px solid var(--tk-border);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] .cb-output {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.cb-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--tk-border);
+}
+
+.cb-output-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.cb-output-status--ok  { color: #34d399; }
+.cb-output-status--err { color: #f87171; }
+
+.cb-output-clear {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--tk-text-muted);
+  transition: color 0.12s ease;
+}
+
+.cb-output-clear:hover { color: #f87171; }
+
+.cb-output-pre {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  color: var(--tk-text);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 240px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
 .tr-code-block-item .tr-code-input {
   border-radius: 0;
   border: none;
