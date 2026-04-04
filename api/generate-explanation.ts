@@ -10,30 +10,37 @@
  */
 
 const SYSTEM_PROMPT =
-  'You are a senior software engineer writing concise, practical learning notes. ' +
-  'Your output is code-first: let code do most of the teaching. ' +
+  'You are a concise ML/CS educator. Write short, crystal-clear learning notes with real examples. ' +
   'Respond with valid JSON only — no markdown fences, no extra text, just the raw JSON object.';
 
 function buildUserPrompt(topicTitle: string, topicPath?: string): string {
   const pathContext = topicPath ? `\nFull topic path: ${topicPath}` : '';
-  return `Create a sharp, practical learning note for: "${topicTitle}"${pathContext}
+  return `Create a sharp learning note for: "${topicTitle}"${pathContext}
 
-Rules:
-- "title": A clear, specific title (max 8 words).
-- "explanation": 2–4 SHORT paragraphs. Be direct and practical. Skip intros like "In this note…". Add a real-world analogy ONLY if it genuinely clarifies the concept — never force one. Focus on WHY it matters and HOW it works.
-- "code": This is the most important field. Write practical, well-commented, teaching-oriented code.
-  - If the topic is a broad concept (e.g. "Data Structures", "Sorting Algorithms", "Design Patterns"), include MULTIPLE labeled examples covering the key subtypes/implementations in a single code block, separated by clear comments.
-  - If the topic is specific (e.g. "Binary Search"), write one focused, complete example with edge cases shown.
-  - Use Python unless another language is clearly more idiomatic for the topic.
-  - Return an empty string ONLY if code genuinely does not apply (e.g. a soft concept like "Agile Methodology").
-- "formula": A key formula or notation if relevant (e.g. "O(log n)", "y = wx + b"). Return empty string if not applicable.
+Style guide — follow this exact pattern:
 
-Return ONLY this JSON, nothing else:
+explanation example for "Dot Product":
+"An operation between two vectors that multiplies corresponding elements and sums the result, returning a single number.\n\nIn Machine Learning:\nDot product is used to combine features with weights.\n\nExample:\ny = w · x + b\n\nThis is the core of linear regression and neural networks."
+
+Rules for each field:
+- "title": Max 7 words. Clear and specific.
+- "explanation": SHORT — 1 sentence definition, then context in ML/CS (1–2 sentences), then a tiny concrete Example block showing the formula/idea. End with 1 sentence on why it matters. No fluff.
+- "code": Practical, well-commented Python (or the most natural language). For broad topics, show multiple labeled examples. For specific topics, one complete focused example. Return "" only for non-technical concepts.
+- "formula": The key mathematical expression (e.g. "y = w · x + b"). Use Unicode math symbols (·, σ, μ, Σ, √, ², ∂, ∇). Return "" if not applicable.
+- "sub_expressions": An array of the symbols/parts used in the formula. Each entry has:
+  - "expression": the symbol or sub-formula (e.g. "w", "μ", "σ²", "Σᵢ")
+  - "name": short label (e.g. "weights", "mean", "variance")
+  - "value": brief meaning (e.g. "learned parameters", "average of all values", "spread of data")
+  Include entries for EVERY symbol in the formula. If formula is "", return [].
+  For statistics/math: always expand μ (mean), σ (std), Σ (sum), etc.
+
+Return ONLY this JSON:
 {
   "title": "...",
   "explanation": "...",
   "code": "...",
-  "formula": "..."
+  "formula": "...",
+  "sub_expressions": [{"expression": "...", "name": "...", "value": "..."}]
 }`;
 }
 

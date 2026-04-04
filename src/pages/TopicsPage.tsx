@@ -402,11 +402,13 @@ export function TopicsPage() {
         explanation?: string;
         code?: string;
         formula?: string;
+        sub_expressions?: { expression: string; name: string; value: string }[];
       };
       if (data.title?.trim())       setNoteTitle(data.title.trim());
       if (data.explanation?.trim()) setNoteContent(data.explanation.trim());
       if (data.code?.trim())        setCodeBlocks([{ language: 'Python', code: data.code.trim() }]);
       if (data.formula?.trim())     { setNoteMath(data.formula.trim()); setShowMathBlock(true); }
+      if (data.sub_expressions?.length) setSubExpressions(data.sub_expressions);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Generation failed';
       setAiError(msg);
