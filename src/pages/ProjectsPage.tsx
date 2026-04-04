@@ -203,7 +203,7 @@ export function ProjectsPage() {
       {modal && (
         <div className="tr-backdrop" onClick={closeModal}>
           <div
-            className="tr-modal tr-modal--form"
+            className="tr-modal tr-modal--project"
             onClick={e => e.stopPropagation()}
           >
             <div className="tr-modal-header">
