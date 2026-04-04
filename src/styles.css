@@ -1883,13 +1883,13 @@ code {
 
 .tr-modal {
   width: min(720px, 96vw);
+  max-height: calc(100dvh - 3rem);
   border-radius: 14px;
   background: var(--tk-modal-bg);
   border: 1px solid var(--tk-border-strong);
   box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
   display: flex;
   flex-direction: column;
-  gap: 0;
   overflow: hidden;
   animation: mfSlideUp 0.22s cubic-bezier(0.34,1.4,0.64,1);
 }
@@ -1905,6 +1905,7 @@ code {
   gap: 0.75rem;
   padding: 1.1rem 1.2rem 0.9rem;
   border-bottom: 1px solid var(--tk-border);
+  flex-shrink: 0;
 }
 
 .tr-modal-icon {
@@ -1964,6 +1965,9 @@ code {
   padding: 1.1rem 1.2rem;
   display: grid;
   gap: 0.85rem;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 0;
 }
 
 .tr-modal-form {
@@ -1977,6 +1981,7 @@ code {
   gap: 0.5rem;
   padding: 0.75rem 1.2rem 1rem;
   border-top: 1px solid var(--tk-border);
+  flex-shrink: 0;
 }
 
 /* Modal input overrides (slightly larger) */
@@ -3019,48 +3024,45 @@ code {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ─────────────────────────────────────────────────────────────────────────
-   1. Modal: fixed header/footer, scrollable body, fills viewport height
+   1. Modal: sticky header/footer, scrollable body
    ───────────────────────────────────────────────────────────────────────── */
 
-.tr-backdrop {
-  align-items: flex-start;
-  padding: 1rem;
-  overflow-y: auto;
-}
-
-.tr-modal {
-  width: min(720px, 96vw);
-  max-height: calc(100dvh - 2rem);
-  /* NO forced height — auto-sizes to content; only the notes modal is full-height */
-  display: flex;
-  flex-direction: column;
-}
+/* Base rules above already handle desktop centering + scrollable body.
+   Only mobile/tablet overrides go below in their respective @media blocks. */
 
 .tr-modal-header  { flex-shrink: 0; }
 .tr-modal-actions { flex-shrink: 0; }
 
-.tr-modal-body {
-  flex: 1 1 0;
-  overflow-y: auto;
-  min-height: 0;
-}
-
 /* Form modal (note / edit-note) — tall enough to not look bare */
 .tr-modal--form {
-  min-height: min(640px, calc(100dvh - 2rem));
+  min-height: min(640px, calc(100dvh - 3rem));
+}
+
+/* Compact modal (confirm dialogs etc.) — just wraps its content */
+.tr-modal--compact {
+  width: min(480px, 96vw);
+}
+
+/* Danger icon variant */
+.tr-modal-icon--danger {
+  background: rgba(239,68,68,0.1) !important;
+  border-color: rgba(239,68,68,0.25) !important;
+  color: #ef4444 !important;
 }
 
 /* Notes wide modal — full height needed for two-panel layout */
 .tr-modal--notes {
   width: min(1100px, 96vw);
-  height: calc(100dvh - 2rem);
-  max-height: calc(100dvh - 2rem);
+  height: calc(100dvh - 3rem);
+  max-height: calc(100dvh - 3rem);
 }
 
 .tr-modal-body--notes {
   flex: 1 1 0;
   overflow: hidden;
   min-height: 0;
+  padding: 0;
+  gap: 0;
 }
 
 .tr-vn-layout {

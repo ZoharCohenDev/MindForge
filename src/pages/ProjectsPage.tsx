@@ -203,15 +203,20 @@ export function ProjectsPage() {
       {modal && (
         <div className="tr-backdrop" onClick={closeModal}>
           <div
-            className="tr-modal"
-            style={{ width: 'min(600px, 100%)' }}
+            className="tr-modal tr-modal--form"
             onClick={e => e.stopPropagation()}
           >
             <div className="tr-modal-header">
+              <div className="tr-modal-icon">
+                <Briefcase size={15} />
+              </div>
               <div className="tr-modal-title-block">
                 <strong>{modal.type === 'add' ? 'New Project' : 'Edit Project'}</strong>
+                <p className="tr-modal-parent">
+                  {modal.type === 'add' ? 'Fill in the details below' : `Editing "${modal.project.name}"`}
+                </p>
               </div>
-              <button className="tr-modal-close" onClick={closeModal}>
+              <button className="tr-modal-close" onClick={closeModal} aria-label="Close">
                 <X size={16} />
               </button>
             </div>

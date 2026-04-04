@@ -1267,18 +1267,29 @@ except ImportError:
       {/* Delete confirmation dialog */}
       {confirmDelete && (
         <div className="tr-backdrop tr-confirm-backdrop" onClick={() => setConfirmDelete(null)}>
-          <div className="tr-confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="tr-confirm-icon">
-              <Trash2 size={20} />
+          <div className="tr-modal tr-modal--compact" onClick={(e) => e.stopPropagation()}>
+            <div className="tr-modal-header">
+              <div className="tr-modal-icon tr-modal-icon--danger">
+                <Trash2 size={15} />
+              </div>
+              <div className="tr-modal-title-block">
+                <strong>Confirm Delete</strong>
+                <p className="tr-modal-parent">This action cannot be undone</p>
+              </div>
+              <button type="button" className="tr-modal-close" onClick={() => setConfirmDelete(null)} aria-label="Close">
+                <X size={15} />
+              </button>
             </div>
-            <p className="tr-confirm-text">
-              Delete <strong>"{confirmDelete.label}"</strong>?
-              {confirmDelete.kind === 'topic' && (
-                <> This will also delete all child topics.</>
-              )}
-              {' '}This cannot be undone.
-            </p>
-            <div className="tr-confirm-actions">
+            <div className="tr-modal-body">
+              <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--tk-text)', lineHeight: 1.6 }}>
+                Delete <strong>"{confirmDelete.label}"</strong>?
+                {confirmDelete.kind === 'topic' && (
+                  <> This will also delete all child topics.</>
+                )}
+                {' '}This cannot be undone.
+              </p>
+            </div>
+            <div className="tr-modal-actions">
               <button
                 type="button"
                 className="secondary-button"
