@@ -38,7 +38,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // On TOKEN_REFRESH_FAILED or explicit sign-out, clear any stale local
+      // state so the app lands cleanly on the login screen.
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !nextSession) {
+        setSession(null);
+        setIsLoading(false);
+        return;
+      }
       setSession(nextSession);
       setIsLoading(false);
     });
