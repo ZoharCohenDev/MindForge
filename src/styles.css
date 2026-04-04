@@ -1894,6 +1894,7 @@ code {
 }
 
 .tr-modal {
+  width: min(720px, 96vw);
   border-radius: 14px;
   background: var(--tk-modal-bg);
   border: 1px solid var(--tk-border-strong);
@@ -2805,6 +2806,77 @@ code {
 
 .ms-add-btn:disabled {
   opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════
+   AI GENERATION ROW (inside Add/Edit Explanation modal)
+═══════════════════════════════════════════════ */
+
+.ai-gen-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  flex-wrap: wrap;
+}
+
+.ai-gen-info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ai-gen-icon {
+  color: var(--tk-accent);
+  flex-shrink: 0;
+}
+
+.ai-gen-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--tk-text);
+}
+
+.ai-gen-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ai-gen-error {
+  font-size: 0.78rem;
+  color: #f87171;
+  max-width: 260px;
+}
+
+.ai-gen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--tk-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.ai-gen-btn:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.ai-gen-btn:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 

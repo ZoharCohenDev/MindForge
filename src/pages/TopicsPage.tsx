@@ -14,6 +14,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -99,6 +100,17 @@ function makeExpandToDepth(topics: Topic[], maxDepth: number = 1) {
   );
 }
 
+function getTopicPath(topicId: string, allTopics: Topic[]): string {
+  const map = new Map(allTopics.map((t) => [t.id, t]));
+  const path: string[] = [];
+  let cur = map.get(topicId);
+  while (cur) {
+    path.unshift(cur.title);
+    cur = cur.parent_id ? map.get(cur.parent_id) : undefined;
+  }
+  return path.join(' → ');
+}
+
 export function TopicsPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -122,6 +134,8 @@ export function TopicsPage() {
   const [subExprValue, setSubExprValue] = useState("");
   const [showSubExprForm, setShowSubExprForm] = useState(false);
   const [isSavingModal, setIsSavingModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -234,6 +248,8 @@ export function TopicsPage() {
     setShowSubExprForm(false);
     setSelectedNoteId(null);
     setConfirmDelete(null);
+    setAiError(null);
+    setIsGenerating(false);
   };
 
   const insertMathSymbol = (symbol: string) => {
@@ -326,6 +342,40 @@ export function TopicsPage() {
     }
   };
 
+  const handleGenerateAI = async () => {
+    if (!modal || (modal.type !== 'note' && modal.type !== 'edit-note')) return;
+    setIsGenerating(true);
+    setAiError(null);
+    try {
+      const topicPath = getTopicPath(modal.topic.id, topics);
+      const response = await fetch('/api/generate-explanation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicTitle: modal.topic.title, topicPath }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? `Server error ${response.status}`);
+      }
+      const data = await response.json() as {
+        title?: string;
+        explanation?: string;
+        code?: string;
+        formula?: string;
+      };
+      if (data.title?.trim())       setNoteTitle(data.title.trim());
+      if (data.explanation?.trim()) setNoteContent(data.explanation.trim());
+      if (data.code?.trim())        setCodeBlocks([{ language: 'Python', code: data.code.trim() }]);
+      if (data.formula?.trim())     { setNoteMath(data.formula.trim()); setShowMathBlock(true); }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Generation failed';
+      setAiError(msg);
+      console.error('[AI generate]', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleDeleteNote = async (noteId: string) => {
     try {
       await deleteTopicNote(noteId);
@@ -378,6 +428,11 @@ export function TopicsPage() {
     const parentIds = new Set(topics.map(t => t.parent_id).filter(Boolean));
     return topics.filter(t => !parentIds.has(t.id));
   }, [topics]);
+
+  const isModalTopicLeaf = useMemo(() => {
+    if (!modal || (modal.type !== 'note' && modal.type !== 'edit-note')) return false;
+    return !topics.some((t) => t.parent_id === modal.topic.id);
+  }, [modal, topics]);
 
   const doneCount = leafTopics.filter((t) => t.status === "done").length;
   const overallProgress =
@@ -691,6 +746,29 @@ export function TopicsPage() {
               )}
               {(modal.type === "note" || modal.type === "edit-note") && (
                 <div className="tr-modal-form">
+                  {/* AI generation — leaf nodes only */}
+                  {isModalTopicLeaf && (
+                    <div className="ai-gen-row">
+                      <div className="ai-gen-info">
+                        <Sparkles size={13} className="ai-gen-icon" />
+                        <span className="ai-gen-label">Auto-fill with AI</span>
+                      </div>
+                      <div className="ai-gen-right">
+                        {aiError && <span className="ai-gen-error">{aiError}</span>}
+                        <button
+                          type="button"
+                          className="ai-gen-btn"
+                          onClick={() => void handleGenerateAI()}
+                          disabled={isGenerating || isSavingModal}
+                          title="Generate explanation, code, and formula using AI"
+                        >
+                          <Sparkles size={12} />
+                          {isGenerating ? 'Generating…' : 'Generate with AI'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <label>
                     Title
                     <input
