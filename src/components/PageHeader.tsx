@@ -1,0 +1,24 @@
+import type { ReactNode } from 'react';
+
+export function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  action
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="page-header">
+      <div>
+        <span className="pill">{eyebrow}</span>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+      </div>
+      {action ? <div>{action}</div> : null}
+    </header>
+  );
+}
