@@ -412,13 +412,13 @@ export function TopicsPage() {
     setRunningIdx(idx);
     setBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; });
     try {
-      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
+      const resp = await fetch('/api/run-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           language: lang.language,
           version: lang.version,
-          files: [{ content: block.code }],
+          code: block.code,
         }),
       });
       if (!resp.ok) throw new Error(`Piston error ${resp.status}`);
