@@ -113,6 +113,32 @@ function getTopicPath(topicId: string, allTopics: Topic[]): string {
   return path.join(' → ');
 }
 
+// ---------------------------------------------------------------------------
+// Pyodide (client-side Python) — loaded once, cached for the session
+// ---------------------------------------------------------------------------
+declare global { interface Window { loadPyodide: (cfg: { indexURL: string }) => Promise<any>; } }
+let _pyodideInstance: any = null;
+let _pyodideLoading: Promise<any> | null = null;
+async function getPyodide(): Promise<any> {
+  if (_pyodideInstance) return _pyodideInstance;
+  if (_pyodideLoading) return _pyodideLoading;
+  _pyodideLoading = (async () => {
+    if (!window.loadPyodide) {
+      await new Promise<void>((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed to load Pyodide'));
+        document.head.appendChild(s);
+      });
+    }
+    const py = await window.loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/' });
+    _pyodideInstance = py;
+    return py;
+  })();
+  return _pyodideLoading;
+}
+
 export function TopicsPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -144,7 +170,7 @@ export function TopicsPage() {
   const [convertErrors, setConvertErrors] = useState<Record<number, string>>({});
   // Per-block run state
   const [runningIdx, setRunningIdx] = useState<number | null>(null);
-  const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number }>>({});
+  const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -402,14 +428,65 @@ export function TopicsPage() {
     if (!PISTON_LANG_MAP.has(block.language)) return;
     setRunningIdx(idx);
     setBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; });
+
+    // ── Python: run client-side via Pyodide (supports numpy/pandas/matplotlib) ──
+    if (block.language === 'Python') {
+      try {
+        const py = await getPyodide();
+        let stdout = '';
+        let stderr = '';
+        py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
+        py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
+        // Override plt.show() to capture plots as base64 PNGs
+        await py.runPythonAsync(`
+_plot_images = []
+try:
+    import matplotlib as _mpl
+    _mpl.use('Agg')
+    import matplotlib.pyplot as _plt
+    import io as _io, base64 as _b64
+    def _show_capture(*a, **kw):
+        buf = _io.BytesIO()
+        _plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+        buf.seek(0)
+        _plot_images.append(_b64.b64encode(buf.read()).decode())
+        _plt.close('all')
+    _plt.show = _show_capture
+except ImportError:
+    pass
+        `);
+        await py.loadPackagesFromImports(block.code);
+        let exitCode = 0;
+        try {
+          await py.runPythonAsync(block.code);
+        } catch (pyErr: unknown) {
+          stderr = String(pyErr);
+          exitCode = 1;
+        }
+        const rawImages = py.runPython('_plot_images');
+        const plotImages: string[] = rawImages && typeof rawImages.toJs === 'function'
+          ? (rawImages.toJs() as string[])
+          : [];
+        setBlockOutputs(prev => ({
+          ...prev,
+          [idx]: { stdout: stdout.trimEnd(), stderr: stderr.trimEnd(), exitCode, plotImages },
+        }));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Execution failed';
+        setBlockOutputs(prev => ({ ...prev, [idx]: { stdout: '', stderr: msg, exitCode: 1 } }));
+        console.error('[run-code]', err);
+      } finally {
+        setRunningIdx(null);
+      }
+      return;
+    }
+
+    // ── All other languages: proxy through Judge0 ──
     try {
       const resp = await fetch('/api/run-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          language: block.language,
-          code: block.code,
-        }),
+        body: JSON.stringify({ language: block.language, code: block.code }),
       });
       const data = await resp.json() as any;
       if (!resp.ok) throw new Error(data?.error ?? `Execution failed (${resp.status})`);
@@ -969,8 +1046,11 @@ export function TopicsPage() {
                                 </button>
                               </div>
                               <pre className="cb-output-pre">
-                                {(blockOutputs[idx].stdout + blockOutputs[idx].stderr).trimEnd() || '(no output)'}
+                                {(blockOutputs[idx].stdout + (blockOutputs[idx].stdout && blockOutputs[idx].stderr ? '\n' : '') + blockOutputs[idx].stderr).trimEnd() || '(no output)'}
                               </pre>
+                              {blockOutputs[idx].plotImages?.map((img, i) => (
+                                <img key={i} src={`data:image/png;base64,${img}`} alt={`plot ${i + 1}`} style={{ maxWidth: '100%', marginTop: '8px', borderRadius: '4px', display: 'block' }} />
+                              ))}
                             </div>
                           )}
                           {/* Run button — only for executable languages */}
