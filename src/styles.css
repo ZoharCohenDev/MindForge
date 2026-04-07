@@ -1821,6 +1821,8 @@ code {
   color: var(--tk-text-muted);
   white-space: pre-wrap;
   line-height: 1.6;
+  direction: rtl;
+  text-align: right;
 }
 
 .tr-view-note-code {
@@ -2062,6 +2064,12 @@ code {
   resize: none;
 }
 
+/* RTL for Hebrew explanation textarea */
+.tr-modal textarea:not(.tr-code-input) {
+  direction: rtl;
+  text-align: right;
+}
+
 /* Animations */
 
 @keyframes mfFadeIn {
@@ -2279,6 +2287,8 @@ code {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  direction: rtl;
+  text-align: right;
 }
 
 /* Delete icon — shown on hover */

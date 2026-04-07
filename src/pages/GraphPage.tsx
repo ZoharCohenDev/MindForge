@@ -316,7 +316,7 @@ except ImportError:
       {open && (
         <div style={{ padding: '0 12px 11px' }}>
           {/* Body text */}
-          <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: 'var(--gp-note-body)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: 'var(--gp-note-body)', lineHeight: 1.7, whiteSpace: 'pre-wrap', direction: 'rtl', textAlign: 'right' }}>
             {note.content}
           </p>
 
