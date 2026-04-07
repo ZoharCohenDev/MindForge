@@ -1903,6 +1903,13 @@ code {
   margin-top: 4px;
 }
 
+.tr-paste-hint {
+  font-size: 0.75rem;
+  color: var(--tk-text-muted);
+  opacity: 0.6;
+  user-select: none;
+}
+
 .tr-attachments-list {
   display: flex;
   flex-wrap: wrap;

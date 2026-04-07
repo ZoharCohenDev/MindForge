@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRightLeft,
@@ -144,7 +144,6 @@ export function TopicsPage() {
   const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
   const [noteAttachments, setNoteAttachments] = useState<Attachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);;
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -1245,6 +1244,24 @@ except ImportError:
                       value={noteContent}
                       onChange={(e) => setNoteContent(e.target.value)}
                       placeholder="Your explanation, examples, shortcuts…"
+                      onPaste={async (e) => {
+                        const items = Array.from(e.clipboardData.items);
+                        const imageItem = items.find(it => it.type.startsWith('image/'));
+                        if (!imageItem) return;
+                        e.preventDefault();
+                        const file = imageItem.getAsFile();
+                        if (!file) return;
+                        setUploadingFile(true);
+                        try {
+                          const att = await uploadNoteAttachment(file);
+                          setNoteAttachments(prev => [...prev, att]);
+                        } catch (err) {
+                          console.error(err);
+                          editor.setEditorError('Could not upload pasted image. Check Supabase Storage is configured.');
+                        } finally {
+                          setUploadingFile(false);
+                        }
+                      }}
                     />
                   </label>
 
@@ -1450,36 +1467,9 @@ except ImportError:
                         ))}
                       </div>
                     )}
-                    <button
-                      type="button"
-                      className="tr-add-code-btn"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingFile}
-                    >
-                      <Plus size={13} />
-                      {uploadingFile ? 'Uploading…' : 'Attach image / PDF'}
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,.pdf,application/pdf"
-                      style={{ display: 'none' }}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        e.target.value = '';
-                        setUploadingFile(true);
-                        try {
-                          const att = await uploadNoteAttachment(file);
-                          setNoteAttachments(prev => [...prev, att]);
-                        } catch (err) {
-                          console.error(err);
-                          editor.setEditorError('Could not upload file. Check Supabase Storage is configured.');
-                        } finally {
-                          setUploadingFile(false);
-                        }
-                      }}
-                    />
+                    <span className="tr-paste-hint">
+                      {uploadingFile ? 'Uploading image…' : '📋 Paste an image to attach it'}
+                    </span>
                   </div>
                 </div>
               )}
