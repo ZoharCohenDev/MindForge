@@ -144,6 +144,7 @@ export function TopicsPage() {
   const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
   const [noteAttachments, setNoteAttachments] = useState<Attachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [pastingToNote, setPastingToNote] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -429,6 +430,54 @@ export function TopicsPage() {
       editor.setEditorError("Could not save your change.");
     } finally {
       setIsSavingModal(false);
+    }
+  };
+
+  const handlePasteToActiveNote = async (e: React.ClipboardEvent, note: typeof activeNote) => {
+    if (!note) return;
+    const items = Array.from(e.clipboardData.items);
+    const imageItem = items.find(it => it.type.startsWith('image/'));
+    if (!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    setPastingToNote(true);
+    try {
+      const att = await uploadNoteAttachment(file);
+      const newAttachments = [...(note.attachments ?? []), att];
+      await updateTopicNote(note.id, {
+        title: note.title,
+        content: note.content,
+        code_blocks: note.code_blocks,
+        math_expression: note.math_expression,
+        sub_expressions: note.sub_expressions,
+        attachments: newAttachments,
+      });
+      await editor.refresh(true);
+    } catch (err) {
+      console.error(err);
+      editor.setEditorError('Could not save pasted image.');
+    } finally {
+      setPastingToNote(false);
+    }
+  };
+
+  const handleRemoveAttachmentFromActiveNote = async (note: typeof activeNote, idx: number) => {
+    if (!note) return;
+    const newAttachments = (note.attachments ?? []).filter((_, i) => i !== idx);
+    try {
+      await updateTopicNote(note.id, {
+        title: note.title,
+        content: note.content,
+        code_blocks: note.code_blocks,
+        math_expression: note.math_expression,
+        sub_expressions: note.sub_expressions,
+        attachments: newAttachments.length > 0 ? newAttachments : null,
+      });
+      await editor.refresh(true);
+    } catch (err) {
+      console.error(err);
+      editor.setEditorError('Could not remove attachment.');
     }
   };
 
@@ -1496,7 +1545,9 @@ except ImportError:
                     {/* Right content panel */}
                     <div className="tr-vn-content">
                       {activeNote ? (
-                        <div className="tr-vn-note">
+                        <div className="tr-vn-note"
+                          onPaste={(e) => void handlePasteToActiveNote(e, activeNote)}
+                        >
                           <div className="tr-vn-note-header">
                             <span className="tr-vn-note-title">{activeNote.title}</span>
                             <div className="tr-view-note-actions">
@@ -1554,19 +1605,38 @@ except ImportError:
                             <div className="tr-view-attachments">
                               {activeNote.attachments.map((att, idx) => (
                                 att.type === 'image' ? (
-                                  <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-img-wrap">
-                                    <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
+                                  <div key={idx} className="tr-view-attachment-img-wrap">
+                                    <button
+                                      type="button"
+                                      className="tr-attachment-remove tr-view-attachment-remove"
+                                      onClick={() => void handleRemoveAttachmentFromActiveNote(activeNote, idx)}
+                                      title="Remove"
+                                    ><X size={11} /></button>
+                                    <a href={att.url} target="_blank" rel="noopener noreferrer">
+                                      <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
+                                    </a>
                                     <span className="tr-view-attachment-label">{att.name}</span>
-                                  </a>
+                                  </div>
                                 ) : (
-                                  <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-pdf">
-                                    <span className="tr-attachment-pdf-icon">PDF</span>
-                                    <span className="tr-view-attachment-label">{att.name}</span>
-                                  </a>
+                                  <div key={idx} style={{ position: 'relative' }}>
+                                    <button
+                                      type="button"
+                                      className="tr-attachment-remove tr-view-attachment-remove"
+                                      onClick={() => void handleRemoveAttachmentFromActiveNote(activeNote, idx)}
+                                      title="Remove"
+                                    ><X size={11} /></button>
+                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-pdf">
+                                      <span className="tr-attachment-pdf-icon">PDF</span>
+                                      <span className="tr-view-attachment-label">{att.name}</span>
+                                    </a>
+                                  </div>
                                 )
                               ))}
                             </div>
                           )}
+                          <span className="tr-paste-hint">
+                            {pastingToNote ? 'Uploading image…' : '📋 Paste an image to attach it'}
+                          </span>
                         </div>
                       ) : null}
                     </div>

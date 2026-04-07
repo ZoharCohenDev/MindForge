@@ -1995,6 +1995,19 @@ code {
   gap: 4px;
   text-decoration: none;
   max-width: 140px;
+  position: relative;
+}
+
+.tr-view-attachment-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 1;
+  background: var(--tk-surface-2) !important;
+  border: 1px solid var(--tk-border) !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
 }
 
 .tr-view-attachment-img {
