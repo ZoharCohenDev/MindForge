@@ -46,7 +46,7 @@ export function sortTreeNodes(nodes: TreeNode[]): TreeNode[] {
 export function calcTreeProgress(node: TreeNode): number {
   const all: TreeNode[] = [];
   const walk = (n: TreeNode) => {
-    all.push(n);
+    if (n.children.length === 0) all.push(n);
     n.children.forEach(walk);
   };
   node.children.forEach(walk);
