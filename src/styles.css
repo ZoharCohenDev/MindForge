@@ -1910,6 +1910,39 @@ code {
   user-select: none;
 }
 
+/* Edit-mode attachment grid (create / edit modal) */
+
+.tr-edit-attachments-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tr-edit-attachment-item {
+  position: relative;
+  border-radius: 6px;
+  overflow: visible;
+}
+
+.tr-edit-attachment-img {
+  display: block;
+  width: 120px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--tk-border);
+}
+
+.tr-edit-attachment-pdf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--tk-border);
+  background: var(--tk-surface-2);
+}
+
 .tr-attachments-list {
   display: flex;
   flex-wrap: wrap;

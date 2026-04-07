@@ -145,6 +145,8 @@ export function TopicsPage() {
   const [noteAttachments, setNoteAttachments] = useState<Attachment[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [pastingToNote, setPastingToNote] = useState(false);
+  const [viewRunningIdx, setViewRunningIdx] = useState<number | null>(null);
+  const [viewBlockOutputs, setViewBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -478,6 +480,80 @@ export function TopicsPage() {
     } catch (err) {
       console.error(err);
       editor.setEditorError('Could not remove attachment.');
+    }
+  };
+
+  const handleViewRunCode = async (code: string, language: string, idx: number) => {
+    if (!PISTON_LANG_MAP.has(language)) return;
+    setViewRunningIdx(idx);
+    setViewBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; });
+
+    if (language === 'Python') {
+      try {
+        const py = await getPyodide();
+        let stdout = '';
+        let stderr = '';
+        py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
+        py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
+        py.runPython(`
+import sys, io, base64, json
+_plot_images = []
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    _orig_show = plt.show
+    def _capture_show(*a, **kw):
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        _plot_images.append(base64.b64encode(buf.read()).decode())
+        plt.clf()
+    plt.show = _capture_show
+except Exception:
+    pass
+`);
+        let exitCode = 0;
+        try {
+          py.runPython(code);
+        } catch (pyErr) {
+          stderr = String(pyErr);
+          exitCode = 1;
+        }
+        const rawImages = py.runPython('_plot_images');
+        const plotImages: string[] = rawImages && typeof rawImages.toJs === 'function'
+          ? (rawImages.toJs() as string[]) : [];
+        setViewBlockOutputs(prev => ({
+          ...prev,
+          [idx]: { stdout: stdout.trimEnd(), stderr: stderr.trimEnd(), exitCode, plotImages },
+        }));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Execution failed';
+        setViewBlockOutputs(prev => ({ ...prev, [idx]: { stdout: '', stderr: msg, exitCode: 1 } }));
+      } finally {
+        setViewRunningIdx(null);
+      }
+      return;
+    }
+
+    try {
+      const resp = await fetch('/api/run-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language, code }),
+      });
+      const data = await resp.json() as any;
+      if (!resp.ok) throw new Error(data?.error ?? `Execution failed (${resp.status})`);
+      const typed = data as { run: { stdout: string; stderr: string; code: number } };
+      setViewBlockOutputs(prev => ({
+        ...prev,
+        [idx]: { stdout: typed.run.stdout ?? '', stderr: typed.run.stderr ?? '', exitCode: typed.run.code ?? 0 },
+      }));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Execution failed';
+      setViewBlockOutputs(prev => ({ ...prev, [idx]: { stdout: '', stderr: msg, exitCode: 1 } }));
+    } finally {
+      setViewRunningIdx(null);
     }
   };
 
@@ -1253,7 +1329,27 @@ except ImportError:
                 </label>
               )}
               {(modal.type === "note" || modal.type === "edit-note") && (
-                <div className="tr-modal-form">
+                <div
+                  className="tr-modal-form"
+                  onPaste={async (e) => {
+                    const items = Array.from(e.clipboardData.items);
+                    const imageItem = items.find(it => it.type.startsWith('image/'));
+                    if (!imageItem) return;
+                    e.preventDefault();
+                    const file = imageItem.getAsFile();
+                    if (!file) return;
+                    setUploadingFile(true);
+                    try {
+                      const att = await uploadNoteAttachment(file);
+                      setNoteAttachments(prev => [...prev, att]);
+                    } catch (err) {
+                      console.error(err);
+                      editor.setEditorError('Could not upload pasted image. Check Supabase Storage is configured.');
+                    } finally {
+                      setUploadingFile(false);
+                    }
+                  }}
+                >
                   {/* AI generation — leaf nodes only */}
                   {isModalTopicLeaf && (
                     <div className="ai-gen-row">
@@ -1293,24 +1389,6 @@ except ImportError:
                       value={noteContent}
                       onChange={(e) => setNoteContent(e.target.value)}
                       placeholder="Your explanation, examples, shortcuts…"
-                      onPaste={async (e) => {
-                        const items = Array.from(e.clipboardData.items);
-                        const imageItem = items.find(it => it.type.startsWith('image/'));
-                        if (!imageItem) return;
-                        e.preventDefault();
-                        const file = imageItem.getAsFile();
-                        if (!file) return;
-                        setUploadingFile(true);
-                        try {
-                          const att = await uploadNoteAttachment(file);
-                          setNoteAttachments(prev => [...prev, att]);
-                        } catch (err) {
-                          console.error(err);
-                          editor.setEditorError('Could not upload pasted image. Check Supabase Storage is configured.');
-                        } finally {
-                          setUploadingFile(false);
-                        }
-                      }}
                     />
                   </label>
 
@@ -1496,28 +1574,25 @@ except ImportError:
                   {/* Attachments */}
                   <div className="tr-attachments-section">
                     {noteAttachments.length > 0 && (
-                      <div className="tr-attachments-list">
+                      <div className="tr-edit-attachments-grid">
                         {noteAttachments.map((att, idx) => (
-                          <div key={idx} className="tr-attachment-chip">
-                            {att.type === 'image'
-                              ? <img src={att.url} alt={att.name} className="tr-attachment-thumb" />
-                              : <span className="tr-attachment-pdf-icon">PDF</span>
-                            }
-                            <span className="tr-attachment-name">{att.name}</span>
+                          <div key={idx} className="tr-edit-attachment-item">
                             <button
                               type="button"
-                              className="tr-attachment-remove"
+                              className="tr-attachment-remove tr-view-attachment-remove"
                               onClick={() => setNoteAttachments(prev => prev.filter((_, i) => i !== idx))}
-                              title="Remove attachment"
-                            >
-                              <X size={11} />
-                            </button>
+                              title="Remove"
+                            ><X size={11} /></button>
+                            {att.type === 'image'
+                              ? <img src={att.url} alt={att.name} className="tr-edit-attachment-img" />
+                              : <div className="tr-edit-attachment-pdf"><span className="tr-attachment-pdf-icon">PDF</span><span className="tr-attachment-name">{att.name}</span></div>
+                            }
                           </div>
                         ))}
                       </div>
                     )}
                     <span className="tr-paste-hint">
-                      {uploadingFile ? 'Uploading image…' : '📋 Paste an image to attach it'}
+                      {uploadingFile ? 'Uploading image…' : '📋 Paste an image anywhere in this form to attach it'}
                     </span>
                   </div>
                 </div>
@@ -1534,7 +1609,7 @@ except ImportError:
                           key={note.id}
                           type="button"
                           className={`tr-vn-sidebar-item${activeNote?.id === note.id ? " tr-vn-sidebar-item-active" : ""}`}
-                          onClick={() => setSelectedNoteId(note.id)}
+                          onClick={() => { setSelectedNoteId(note.id); setViewBlockOutputs({}); setViewRunningIdx(null); }}
                           title={note.title}
                         >
                           {note.title}
@@ -1574,14 +1649,45 @@ except ImportError:
                             <pre className="tr-view-note-code"><code>{activeNote.code_example}</code></pre>
                           )}
                           {activeNote.code_blocks && activeNote.code_blocks.length > 0 && (
-                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                               {activeNote.code_blocks.map((block, idx) => (
-                                <div key={idx}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
-                                    <Code2 size={11} style={{ color: 'var(--tk-accent)' }} />
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--tk-accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{block.language}</span>
+                                <div key={idx} className="tr-code-block-item">
+                                  <div className="tr-code-block-header">
+                                    <div className="tr-code-block-lang-wrap">
+                                      <Code2 size={12} />
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--tk-accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{block.language}</span>
+                                    </div>
                                   </div>
-                                  <pre className="tr-view-note-code"><code>{block.code}</code></pre>
+                                  <pre className="tr-view-note-code" style={{ margin: 0 }}><code>{block.code}</code></pre>
+                                  {PISTON_LANG_MAP.has(block.language) && (
+                                    <button
+                                      type="button"
+                                      className="cb-run-btn"
+                                      onClick={() => void handleViewRunCode(block.code, block.language, idx)}
+                                      disabled={viewRunningIdx === idx || !block.code.trim()}
+                                    >
+                                      <Play size={11} />
+                                      {viewRunningIdx === idx ? 'Running…' : 'Run'}
+                                    </button>
+                                  )}
+                                  {viewBlockOutputs[idx] !== undefined && (
+                                    <div className="cb-output">
+                                      <div className="cb-output-header">
+                                        <span className={`cb-output-status ${viewBlockOutputs[idx].exitCode === 0 ? 'cb-output-status--ok' : 'cb-output-status--err'}`}>
+                                          {viewBlockOutputs[idx].exitCode === 0 ? '✓ exit 0' : `✗ exit ${viewBlockOutputs[idx].exitCode}`}
+                                        </span>
+                                        <button type="button" className="cb-output-clear" onClick={() => setViewBlockOutputs(prev => { const n = { ...prev }; delete n[idx]; return n; })} title="Clear">
+                                          <X size={11} />
+                                        </button>
+                                      </div>
+                                      <pre className="cb-output-pre">
+                                        {(viewBlockOutputs[idx].stdout + (viewBlockOutputs[idx].stdout && viewBlockOutputs[idx].stderr ? '\n' : '') + viewBlockOutputs[idx].stderr).trimEnd() || '(no output)'}
+                                      </pre>
+                                      {viewBlockOutputs[idx].plotImages?.map((img, i) => (
+                                        <img key={i} src={`data:image/png;base64,${img}`} alt={`plot ${i + 1}`} style={{ maxWidth: '100%', marginTop: '8px', borderRadius: '4px', display: 'block' }} />
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
