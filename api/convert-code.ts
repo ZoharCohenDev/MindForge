@@ -15,6 +15,7 @@
 const SYSTEM_PROMPT =
   'You are an expert polyglot programmer. Convert code between programming languages precisely. ' +
   'Preserve the original logic, variable names where idiomatic, and comments. ' +
+  'The "notes" field MUST be written in Hebrew. Code itself stays in the target language as normal. ' +
   'Respond with valid JSON only — no markdown fences, no extra text, just the raw JSON object.';
 
 function buildConvertPrompt(
@@ -29,7 +30,7 @@ Rules:
 - Use idiomatic ${targetLanguage} patterns (e.g. list comprehensions in Python, arrow functions in JS).
 - Keep variable names as close to the original as possible unless naming conventions differ.
 - Preserve comments, adapting them if the syntax differs.
-- "notes": Only include this if there are meaningful conversion differences worth knowing (e.g. "Python has no static types — type hints added", "null vs None"). Keep it to 1-2 sentences max. Return empty string if nothing notable.
+- "notes": Only include this if there are meaningful conversion differences worth knowing (e.g. "Python has no static types — type hints added", "null vs None"). Keep it to 1-2 sentences max. Return empty string if nothing notable. Write in Hebrew.
 
 Source code (${sourceLanguage}):
 \`\`\`

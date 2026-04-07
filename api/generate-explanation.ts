@@ -11,6 +11,7 @@
 
 const SYSTEM_PROMPT =
   'You are a concise ML/CS educator. Write short, crystal-clear learning notes with real examples. ' +
+  'All explanatory text (explanation, name, value fields) MUST be written in Hebrew. Keep code, formulas, and expression symbols in their original form. ' +
   'Respond with valid JSON only — no markdown fences, no extra text, just the raw JSON object.';
 
 function buildUserPrompt(topicTitle: string, topicPath?: string): string {
@@ -23,14 +24,14 @@ explanation example for "Dot Product":
 "An operation between two vectors that multiplies corresponding elements and sums the result, returning a single number.\n\nIn Machine Learning:\nDot product is used to combine features with weights.\n\nExample:\ny = w · x + b\n\nThis is the core of linear regression and neural networks."
 
 Rules for each field:
-- "title": Max 7 words. Clear and specific.
-- "explanation": SHORT — 1 sentence definition, then context in ML/CS (1–2 sentences), then a tiny concrete Example block showing the formula/idea. End with 1 sentence on why it matters. No fluff.
-- "code": Practical, well-commented Python (or the most natural language). For broad topics, show multiple labeled examples. For specific topics, one complete focused example. Return "" only for non-technical concepts.
+- "title": Max 7 words. Clear and specific. Write in Hebrew.
+- "explanation": SHORT — 1 sentence definition, then context in ML/CS (1–2 sentences), then a tiny concrete Example block showing the formula/idea. End with 1 sentence on why it matters. No fluff. Write entirely in Hebrew.
+- "code": Practical, well-commented Python (or the most natural language). For broad topics, show multiple labeled examples. For specific topics, one complete focused example. Return "" only for non-technical concepts. Code and comments stay in English.
 - "formula": The key mathematical expression (e.g. "y = w · x + b"). Use Unicode math symbols (·, σ, μ, Σ, √, ², ∂, ∇). Return "" if not applicable.
 - "sub_expressions": An array of the symbols/parts used in the formula. Each entry has:
   - "expression": the symbol or sub-formula (e.g. "w", "μ", "σ²", "Σᵢ")
-  - "name": short label (e.g. "weights", "mean", "variance")
-  - "value": brief meaning (e.g. "learned parameters", "average of all values", "spread of data")
+  - "name": short label in Hebrew (e.g. "משקולות", "ממוצע", "שונות")
+  - "value": brief meaning in Hebrew (e.g. "פרמטרים נלמדים", "ממוצע כל הערכים", "פיזור הנתונים")
   Include entries for EVERY symbol in the formula. If formula is "", return [].
   For statistics/math: always expand μ (mean), σ (std), Σ (sum), etc.
 

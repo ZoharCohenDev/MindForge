@@ -4,6 +4,7 @@ export const SYSTEM_PROMPT =
   'Every node you produce must be a concrete, specific technical concept — never a generic category. ' +
   'FORBIDDEN titles include: Foundations, Core Concepts, Basics, Overview, Introduction, Advanced Topics, ' +
   'Career Growth, Hands-on Practice, Best Practices, Core Skills, Key Terminology, Essential Tools. ' +
+  'All descriptive text (descriptions, summaries) MUST be written in Hebrew. Keep technical titles and concept names in English. ' +
   'Respond with valid JSON only — no markdown fences, no commentary.';
 
 /* ── Stage 1: Top-level domain generation ────────────────────────────── */
@@ -17,13 +18,15 @@ RULES:
 - Include 8–12 domains depending on role breadth.
 - Order roughly from foundational knowledge → specialised / production topics.
 
+LANGUAGE: All "description" and "summary" values MUST be written in Hebrew. Keep "name" and "title" values in English (technical terms).
+
 Return JSON:
 {
   "name": "<role> Roadmap",
-  "description": "<one sentence describing this learning path>",
+  "description": "<one sentence describing this learning path — in Hebrew>",
   "icon": "<single relevant emoji>",
   "domains": [
-    { "title": "<specific domain name>", "summary": "<one technical sentence>" }
+    { "title": "<specific domain name>", "summary": "<one technical sentence — in Hebrew>" }
   ]
 }`;
 }
@@ -60,12 +63,14 @@ RULES:
 
 Every node at every depth MUST include: title (string), summary (string, 1 sentence), children (array, even if empty).
 
+LANGUAGE: All "summary" values MUST be written in Hebrew. Keep "title" values in English.
+
 Return JSON:
 {
   "children": [
     {
       "title": "<specific concept>",
-      "summary": "<one sentence>",
+      "summary": "<one sentence — in Hebrew>",
       "children": [
         { "title": "...", "summary": "...", "children": [] }
       ]
@@ -102,12 +107,14 @@ RULES:
 
 Every node at every depth MUST include: title (string), summary (string, 1 sentence), children (array, even if empty).
 
+LANGUAGE: All "summary" values MUST be written in Hebrew. Keep "title" values in English.
+
 Return JSON:
 {
   "children": [
     {
       "title": "<specific concept>",
-      "summary": "<one sentence>",
+      "summary": "<one sentence — in Hebrew>",
       "children": [
         { "title": "...", "summary": "...", "children": [] }
       ]
