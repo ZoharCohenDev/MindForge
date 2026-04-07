@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Circle,
   Flag,
+  Info,
 } from 'lucide-react';
 import {
   createProject,
@@ -446,11 +447,27 @@ function ProjectCard({
 }) {
   const cat = CATEGORY_CONFIG[project.category ?? 'personal'];
   const pri = PRIORITY_CONFIG[project.priority ?? 'medium'];
+  const [detailOpen, setDetailOpen] = useState(false);
 
   return (
     <article className="glass-card entity-card" style={{ position: 'relative' }}>
-      {/* Edit / Delete */}
+      {/* Actions */}
       <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '4px' }}>
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          title="View details"
+          style={{
+            padding: '4px 6px',
+            borderRadius: '5px',
+            border: '1px solid var(--tk-border)',
+            background: 'var(--tk-surface-2)',
+            cursor: 'pointer',
+            color: 'var(--tk-text-muted)',
+          }}
+        >
+          <Info size={12} />
+        </button>
         <button
           type="button"
           onClick={() => onEdit(project)}
@@ -481,14 +498,12 @@ function ProjectCard({
         </button>
       </div>
 
-      {/* Name */}
-      <div style={{ paddingRight: '64px' }}>
+      {/* Name + badges */}
+      <div style={{ paddingRight: '88px' }}>
         <h3 style={{ margin: '0 0 8px', fontSize: '0.97rem', fontWeight: 600 }}>
           {project.name}
         </h3>
-
-        {/* Badges */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
           <span
             style={{
               display: 'inline-flex',
@@ -535,81 +550,106 @@ function ProjectCard({
         </div>
       </div>
 
-      {/* Description */}
-      {project.description && (
-        <p style={{ fontSize: '0.87rem', margin: 0, lineHeight: 1.55 }}>
-          {project.description}
-        </p>
-      )}
-
-      {/* Tech stack */}
-      {project.tech_stack.length > 0 && (
-        <div className="tag-row">
-          {project.tech_stack.map(tag => (
-            <span key={tag} className="tag-chip">{tag}</span>
-          ))}
-        </div>
-      )}
-
-      {/* Lessons learned */}
-      {project.lessons_learned && (
-        <div
-          style={{
-            padding: '8px 10px',
-            borderRadius: '6px',
-            backgroundColor: 'rgba(52,211,153,0.07)',
-            border: '1px solid rgba(52,211,153,0.18)',
-            fontSize: '0.82rem',
-            lineHeight: 1.5,
-            color: 'var(--tk-text-muted)',
-          }}
-        >
-          <strong style={{ fontSize: '0.77rem', display: 'block', marginBottom: '3px', color: '#34d399' }}>
-            💡 Lessons learned
-          </strong>
-          {project.lessons_learned}
-        </div>
-      )}
-
-      {/* Links */}
-      {(project.github_url || project.colab_url || project.demo_url) && (
-        <div className="link-row">
-          {project.github_url && (
-            <a
-              href={project.github_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.83rem' }}
-            >
-              <Github size={13} /> GitHub
-            </a>
-          )}
-          {project.demo_url && (
-            <a
-              href={project.demo_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.83rem' }}
-            >
-              <ExternalLink size={13} /> Demo
-            </a>
-          )}
-          {project.colab_url && (
-            <a
-              href={project.colab_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.83rem' }}
-            >
-              <ExternalLink size={13} /> Colab
-            </a>
-          )}
-        </div>
-      )}
-
       {/* Missions */}
       <MissionsPanel projectId={project.id} />
+
+      {/* Detail modal */}
+      {detailOpen && (
+        <ProjectDetailModal project={project} onClose={() => setDetailOpen(false)} />
+      )}
     </article>
+  );
+}
+
+/* ─── Project Detail Modal ───────────────────────────────────────────────── */
+
+function ProjectDetailModal({ project, onClose }: { project: Project; onClose: () => void }) {
+  const cat = CATEGORY_CONFIG[project.category ?? 'personal'];
+  const pri = PRIORITY_CONFIG[project.priority ?? 'medium'];
+
+  return (
+    <div className="tr-backdrop" onClick={onClose}>
+      <div
+        className="tr-modal tr-modal--project"
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '600px', maxHeight: '82vh', overflowY: 'auto' }}
+      >
+        <div className="tr-modal-header">
+          <div className="tr-modal-icon"><Info size={15} /></div>
+          <div className="tr-modal-title-block">
+            <strong>{project.name}</strong>
+            <p className="tr-modal-parent">Project details</p>
+          </div>
+          <button className="tr-modal-close" onClick={onClose} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="tr-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Badges */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '99px', fontSize: '0.73rem', fontWeight: 600, backgroundColor: cat.bg, color: cat.color }}>
+              {cat.icon} {cat.label}
+            </span>
+            <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '0.73rem', fontWeight: 600, backgroundColor: pri.bg, color: pri.color }}>
+              {pri.label} priority
+            </span>
+            {project.deadline && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 8px', borderRadius: '99px', fontSize: '0.73rem', backgroundColor: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+                <Calendar size={10} /> {project.deadline}
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          {project.description && (
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--tk-text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</div>
+              <p style={{ fontSize: '0.9rem', lineHeight: 1.68, margin: 0, whiteSpace: 'pre-wrap', direction: 'rtl', textAlign: 'right' }}>{project.description}</p>
+            </div>
+          )}
+
+          {/* Tech stack */}
+          {project.tech_stack.length > 0 && (
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--tk-text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tech Stack</div>
+              <div className="tag-row">
+                {project.tech_stack.map(tag => <span key={tag} className="tag-chip">{tag}</span>)}
+              </div>
+            </div>
+          )}
+
+          {/* Lessons learned */}
+          {project.lessons_learned && (
+            <div style={{ padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.18)' }}>
+              <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '6px', color: '#34d399' }}>💡 Lessons learned</strong>
+              <p style={{ fontSize: '0.88rem', lineHeight: 1.62, margin: 0, whiteSpace: 'pre-wrap' }}>{project.lessons_learned}</p>
+            </div>
+          )}
+
+          {/* Links */}
+          {(project.github_url || project.colab_url || project.demo_url) && (
+            <div className="link-row">
+              {project.github_url && (
+                <a href={project.github_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem' }}>
+                  <Github size={14} /> GitHub
+                </a>
+              )}
+              {project.demo_url && (
+                <a href={project.demo_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem' }}>
+                  <ExternalLink size={14} /> Demo
+                </a>
+              )}
+              {project.colab_url && (
+                <a href={project.colab_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem' }}>
+                  <ExternalLink size={14} /> Colab
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
