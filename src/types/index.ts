@@ -86,6 +86,13 @@ export type SubExpression = {
   value: string;
 };
 
+export type Attachment = {
+  name: string;
+  url: string;
+  type: 'image' | 'pdf';
+  size: number;
+};
+
 export type CodeBlock = {
   language: string;
   code: string;
@@ -101,6 +108,7 @@ export type Note = {
   math_expression: string | null;
   sub_expressions: SubExpression[] | null;
   code_blocks: CodeBlock[] | null;
+  attachments: Attachment[] | null;
   created_at: string;
 };
 

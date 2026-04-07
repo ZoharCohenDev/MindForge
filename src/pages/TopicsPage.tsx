@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRightLeft,
@@ -24,6 +24,7 @@ import {
 import {
   createTopicNote,
   updateTopicNote,
+  uploadNoteAttachment,
   createTree,
   seedTreeWithSeedNode,
 } from "../lib/dataApi";
@@ -31,7 +32,7 @@ import { treeService } from "../lib/treeService";
 import { SEED_TREES, getSeedTreeBySlug } from "../data/seedTrees";
 import { useTreeGeneration } from "../lib/useTreeGeneration";
 import { GenerationProgress } from "../components/GenerationProgress";
-import type { CodeBlock, Note, SubExpression, Topic, Tree, TreeNode } from "../types";
+import type { Attachment, CodeBlock, Note, SubExpression, Topic, Tree, TreeNode } from "../types";
 import {
   sortTreeNodes,
   calcTreeProgress,
@@ -141,6 +142,9 @@ export function TopicsPage() {
   // Per-block run state
   const [runningIdx, setRunningIdx] = useState<number | null>(null);
   const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
+  const [noteAttachments, setNoteAttachments] = useState<Attachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);;
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -186,6 +190,7 @@ export function TopicsPage() {
     setSubExprName("");
     setSubExprValue("");
     setShowSubExprForm(false);
+    setNoteAttachments([]);
   };
 
   const openEditNoteModal = (note: Note, topic: Topic) => {
@@ -200,6 +205,7 @@ export function TopicsPage() {
     setSubExprName("");
     setSubExprValue("");
     setShowSubExprForm(false);
+    setNoteAttachments(note.attachments ?? []);
   };
 
   const openViewNotesModal = (topic: Topic) => {
@@ -228,6 +234,8 @@ export function TopicsPage() {
     setConvertErrors({});
     setRunningIdx(null);
     setBlockOutputs({});
+    setNoteAttachments([]);
+    setUploadingFile(false);
   };
 
   const insertMathSymbol = (symbol: string) => {
@@ -399,6 +407,7 @@ export function TopicsPage() {
           codeBlocks.filter(b => b.code.trim()).length > 0 ? codeBlocks.filter(b => b.code.trim()) : undefined,
           showMathBlock && noteMath.trim() ? noteMath.trim() : undefined,
           subExpressions.length > 0 ? subExpressions : undefined,
+          noteAttachments.length > 0 ? noteAttachments : undefined,
         );
         editor.setExpandedIds((prev) => ({ ...prev, [modal.topic.id]: true }));
       }
@@ -411,6 +420,7 @@ export function TopicsPage() {
           code_blocks: codeBlocks.filter(b => b.code.trim()).length > 0 ? codeBlocks.filter(b => b.code.trim()) : null,
           math_expression: showMathBlock && noteMath.trim() ? noteMath.trim() : null,
           sub_expressions: subExpressions.length > 0 ? subExpressions : null,
+          attachments: noteAttachments.length > 0 ? noteAttachments : null,
         });
       }
       closeModal();
@@ -1416,6 +1426,61 @@ except ImportError:
                     <FunctionSquare size={13} />
                     {showMathBlock ? "Remove math expression" : "Add math expression"}
                   </button>
+
+                  {/* Attachments */}
+                  <div className="tr-attachments-section">
+                    {noteAttachments.length > 0 && (
+                      <div className="tr-attachments-list">
+                        {noteAttachments.map((att, idx) => (
+                          <div key={idx} className="tr-attachment-chip">
+                            {att.type === 'image'
+                              ? <img src={att.url} alt={att.name} className="tr-attachment-thumb" />
+                              : <span className="tr-attachment-pdf-icon">PDF</span>
+                            }
+                            <span className="tr-attachment-name">{att.name}</span>
+                            <button
+                              type="button"
+                              className="tr-attachment-remove"
+                              onClick={() => setNoteAttachments(prev => prev.filter((_, i) => i !== idx))}
+                              title="Remove attachment"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="tr-add-code-btn"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingFile}
+                    >
+                      <Plus size={13} />
+                      {uploadingFile ? 'Uploading…' : 'Attach image / PDF'}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,.pdf,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        e.target.value = '';
+                        setUploadingFile(true);
+                        try {
+                          const att = await uploadNoteAttachment(file);
+                          setNoteAttachments(prev => [...prev, att]);
+                        } catch (err) {
+                          console.error(err);
+                          editor.setEditorError('Could not upload file. Check Supabase Storage is configured.');
+                        } finally {
+                          setUploadingFile(false);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               )}
               {modal.type === "view-notes" && (
@@ -1493,6 +1558,23 @@ except ImportError:
                                   </li>
                                 ))}
                               </ul>
+                            </div>
+                          )}
+                          {activeNote.attachments && activeNote.attachments.length > 0 && (
+                            <div className="tr-view-attachments">
+                              {activeNote.attachments.map((att, idx) => (
+                                att.type === 'image' ? (
+                                  <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-img-wrap">
+                                    <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
+                                    <span className="tr-view-attachment-label">{att.name}</span>
+                                  </a>
+                                ) : (
+                                  <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-pdf">
+                                    <span className="tr-attachment-pdf-icon">PDF</span>
+                                    <span className="tr-view-attachment-label">{att.name}</span>
+                                  </a>
+                                )
+                              ))}
                             </div>
                           )}
                         </div>

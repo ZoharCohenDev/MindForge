@@ -1,6 +1,31 @@
 import { supabase } from "./supabase";
 import { getSeedTreeBySlug, SEED_TREES } from "../data/seedTrees";
-import type { CodeBlock, Mission, Note, Project, Resource, SeedNode, SubExpression, Topic, Tree, TreeType } from "../types";
+import type { Attachment, CodeBlock, Mission, Note, Project, Resource, SeedNode, SubExpression, Topic, Tree, TreeType } from "../types";
+
+export async function uploadNoteAttachment(file: File): Promise<Attachment> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) throw new Error('Not authenticated');
+
+  const ext = file.name.split('.').pop() ?? 'bin';
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('note-attachments')
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw error;
+
+  const { data: urlData } = supabase.storage
+    .from('note-attachments')
+    .getPublicUrl(path);
+
+  return {
+    name: file.name,
+    url: urlData.publicUrl,
+    type: file.type.startsWith('image/') ? 'image' : 'pdf',
+    size: file.size,
+  };
+}
 
 async function requireUserId() {
   const { data, error } = await supabase.auth.getUser();
@@ -312,16 +337,18 @@ export async function createTopicNote(
   codeBlocks?: CodeBlock[],
   mathExpression?: string,
   subExpressions?: SubExpression[],
+  attachments?: Attachment[],
 ) {
   const userId = await requireUserId();
-  const { error } = await supabase.from("notes").insert({
+  const { error } = await supabase.from('notes').insert({
     user_id: userId,
     topic_id: topicId,
-    title: title?.trim() || "Quick note",
+    title: title?.trim() || 'Quick note',
     content,
     code_blocks: codeBlocks && codeBlocks.length > 0 ? codeBlocks : null,
     math_expression: mathExpression?.trim() || null,
     sub_expressions: subExpressions && subExpressions.length > 0 ? subExpressions : null,
+    attachments: attachments && attachments.length > 0 ? attachments : null,
   });
 
   if (error) throw error;
@@ -329,12 +356,12 @@ export async function createTopicNote(
 
 export async function updateTopicNote(
   noteId: string,
-  payload: { title: string; content: string; code_blocks?: CodeBlock[] | null; math_expression?: string | null; sub_expressions?: SubExpression[] | null },
+  payload: { title: string; content: string; code_blocks?: CodeBlock[] | null; math_expression?: string | null; sub_expressions?: SubExpression[] | null; attachments?: Attachment[] | null },
 ) {
   const { error } = await supabase
-    .from("notes")
+    .from('notes')
     .update(payload)
-    .eq("id", noteId);
+    .eq('id', noteId);
   if (error) throw error;
 }
 

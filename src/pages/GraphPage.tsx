@@ -388,6 +388,24 @@ except ImportError:
           ))}
         </div>
       )}
+      {/* Attachments */}
+      {note.attachments && note.attachments.length > 0 && open && (
+        <div className="tr-view-attachments" style={{ padding: '0 12px 11px' }}>
+          {note.attachments.map((att, idx) => (
+            att.type === 'image' ? (
+              <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-img-wrap">
+                <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
+                <span className="tr-view-attachment-label">{att.name}</span>
+              </a>
+            ) : (
+              <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-pdf">
+                <span className="tr-attachment-pdf-icon">PDF</span>
+                <span className="tr-view-attachment-label">{att.name}</span>
+              </a>
+            )
+          ))}
+        </div>
+      )}
     </div>
   );
 }
