@@ -1,32 +1,12 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
-  ExternalLink,
-  Github,
-  Plus,
-  Pencil,
-  Trash2,
-  Briefcase,
-  BookOpen,
-  PlayCircle,
-  User,
-  Calendar,
-  X,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2,
-  Circle,
-  Flag,
-  Info,
+  ExternalLink, Github, Plus, Pencil, Trash2, Briefcase, BookOpen,
+  PlayCircle, User, Calendar, X, CheckCircle2, Circle, Flag, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
-  createProject,
-  listProjects,
-  updateProject,
-  deleteProject,
-  listMissions,
-  createMission,
-  updateMission,
-  deleteMission,
+  createProject, listProjects, updateProject, deleteProject,
+  listMissions, createMission, updateMission, deleteMission,
 } from '../lib/dataApi';
 import type { Mission, Project, ProjectCategory, ProjectPriority } from '../types';
 
@@ -44,14 +24,22 @@ const CATEGORY_CONFIG: Record<
 
 const PRIORITY_CONFIG: Record<
   ProjectPriority,
-  { label: string; color: string; bg: string }
+  { label: string; color: string; dot: string }
 > = {
-  high:   { label: 'High',   color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
-  medium: { label: 'Medium', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
-  low:    { label: 'Low',    color: '#9ca3af', bg: 'rgba(156,163,175,0.12)' },
+  high:   { label: 'High',   color: '#f87171', dot: '#f87171' },
+  medium: { label: 'Medium', color: '#fbbf24', dot: '#fbbf24' },
+  low:    { label: 'Low',    color: '#9ca3af', dot: '#9ca3af' },
 };
 
-function getPhase(status: string): 'current' | 'future' | 'previous' {
+const PHASE_CONFIG = {
+  current:  { label: '🚀 Current',  color: '#0099CC' },
+  future:   { label: '🔭 Planned',  color: '#f97316' },
+  previous: { label: '✅ Previous', color: '#34d399' },
+} as const;
+
+type Phase = keyof typeof PHASE_CONFIG;
+
+function getPhase(status: string): Phase {
   if (status === 'done') return 'previous';
   if (status === 'in_progress' || status === 'learning') return 'current';
   return 'future';
@@ -71,16 +59,24 @@ const EMPTY_FORM = {
   lessons_learned: '',
 };
 
+/* ─── Main page ────────────────────────────────────────────────────────────────────────── */
+
 export function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [modal, setModal] = useState<ModalState>(null);
+  const [selected, setSelected] = useState<Project | null>(null);
+  const [filter,   setFilter]   = useState<Phase | 'all'>('all');
+  const [modal,    setModal]    = useState<ModalState>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [error,    setError]    = useState<string | null>(null);
+  const [form,     setForm]     = useState(EMPTY_FORM);
 
   const refresh = async () => {
     const data = await listProjects();
     setProjects(data);
+    if (selected) {
+      const updated = data.find(p => p.id === selected.id);
+      setSelected(updated ?? null);
+    }
   };
 
   useEffect(() => { void refresh().catch(console.error); }, []);
@@ -148,102 +144,122 @@ export function ProjectsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this project?')) return;
-    try { await deleteProject(id); await refresh(); }
-    catch (err) { console.error(err); }
+    try {
+      await deleteProject(id);
+      if (selected?.id === id) setSelected(null);
+      await refresh();
+    } catch (err) { console.error(err); }
   };
 
-  const current  = projects.filter(p => getPhase(p.status) === 'current');
-  const future   = projects.filter(p => getPhase(p.status) === 'future');
-  const previous = projects.filter(p => getPhase(p.status) === 'previous');
+  const grouped: Record<Phase, Project[]> = {
+    current:  projects.filter(p => getPhase(p.status) === 'current'),
+    future:   projects.filter(p => getPhase(p.status) === 'future'),
+    previous: projects.filter(p => getPhase(p.status) === 'previous'),
+  };
+
+  const visible = filter === 'all' ? projects : grouped[filter];
 
   return (
-    <div className="page-stack">
-      {/* Header */}
-      <div className="tr-page-bar">
-        <div className="tr-page-bar-left">
-          <h2>Projects</h2>
-          <p>Track your work, Udemy courses, studies and personal builds</p>
+    <div className="pj-page">
+
+      {/* Page header */}
+      <div className="pj-page-header">
+        <div className="pj-page-title">
+          <Briefcase size={20} style={{ color: '#0099CC' }} />
+          <h1 className="pj-page-h1">Projects</h1>
+          <span className="pj-total-pill">{projects.length}</span>
         </div>
-        <div className="tr-page-bar-right">
-          <button
-            className="primary-button"
-            onClick={openAdd}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Plus size={14} /> New Project
-          </button>
-        </div>
+        <button className="primary-button" onClick={openAdd}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Plus size={14} /> New Project
+        </button>
       </div>
 
-      <ProjectSection
-        title="🚀 Current"
-        subtitle="Active — in progress right now"
-        accentColor="#6366f1"
-        projects={current}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-      />
-      <ProjectSection
-        title="🔭 Planned"
-        subtitle="Future — what you want to build or study next"
-        accentColor="#f97316"
-        projects={future}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-      />
-      <ProjectSection
-        title="✅ Previous"
-        subtitle="Done — completed and archived"
-        accentColor="#34d399"
-        projects={previous}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-      />
+      {/* Filter tabs */}
+      <div className="pj-filters">
+        {(['all', 'current', 'future', 'previous'] as Array<Phase | 'all'>).map(f => (
+          <button
+            key={f}
+            className={`pj-filter-tab${filter === f ? ' pj-filter-tab--active' : ''}`}
+            onClick={() => setFilter(f)}
+          >
+            {f === 'all' ? 'All' : PHASE_CONFIG[f].label}
+            <span className="pj-filter-count">
+              {f === 'all' ? projects.length : grouped[f].length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Card grid */}
+      {visible.length === 0 ? (
+        <div className="pj-grid-empty">
+          <Briefcase size={40} />
+          <p>No projects here yet</p>
+          <button className="primary-button" onClick={openAdd}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={14} /> Add one
+          </button>
+        </div>
+      ) : (
+        <div className="pj-grid">
+          {visible.map(p => (
+            <ProjectCard
+              key={p.id}
+              project={p}
+              isActive={selected?.id === p.id}
+              onClick={() => setSelected(prev => prev?.id === p.id ? null : p)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Right drawer via portal */}
+      {selected && createPortal(
+        <>
+          <div className="pj-drawer-backdrop" onClick={() => setSelected(null)} />
+          <div className="pj-drawer">
+            <ProjectDetail
+              key={selected.id}
+              project={selected}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              onClose={() => setSelected(null)}
+            />
+          </div>
+        </>,
+        document.body
+      )}
 
       {/* Add / Edit Modal */}
       {modal && (
         <div className="tr-backdrop" onClick={closeModal}>
-          <div
-            className="tr-modal tr-modal--project"
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="tr-modal tr-modal--project" onClick={e => e.stopPropagation()}>
             <div className="tr-modal-header">
-              <div className="tr-modal-icon">
-                <Briefcase size={15} />
-              </div>
+              <div className="tr-modal-icon"><Briefcase size={15} /></div>
               <div className="tr-modal-title-block">
                 <strong>{modal.type === 'add' ? 'New Project' : 'Edit Project'}</strong>
                 <p className="tr-modal-parent">
-                  {modal.type === 'add' ? 'Fill in the details below' : `Editing "${modal.project.name}"`}
+                  {modal.type === 'add'
+                    ? 'Fill in the details below'
+                    : `Editing "${modal.project.name}"`}
                 </p>
               </div>
               <button className="tr-modal-close" onClick={closeModal} aria-label="Close">
                 <X size={16} />
               </button>
             </div>
-
             <div className="tr-modal-body tr-modal-form">
               <label>
                 Project name *
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={set('name')}
-                  placeholder="e.g. MindForge, ML Classifier"
-                  autoFocus
-                />
+                <input type="text" value={form.name} onChange={set('name')}
+                  placeholder="e.g. MindForge, ML Classifier" autoFocus />
               </label>
-
               <label>
                 Description
-                <textarea
-                  rows={3}
-                  value={form.description}
-                  onChange={set('description')}
-                  placeholder="What is this? What will you build or learn?"
-                />
+                <textarea rows={3} value={form.description} onChange={set('description')}
+                  placeholder="What is this? What will you build or learn?" />
               </label>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <label>
                   Category
@@ -264,7 +280,6 @@ export function ProjectsPage() {
                   </select>
                 </label>
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <label>
                   Priority
@@ -279,63 +294,32 @@ export function ProjectsPage() {
                   <input type="date" value={form.deadline} onChange={set('deadline')} />
                 </label>
               </div>
-
               <label>
                 Tech stack
-                <input
-                  type="text"
-                  value={form.tech_stack}
-                  onChange={set('tech_stack')}
-                  placeholder="React, Python, TensorFlow (comma separated)"
-                />
+                <input type="text" value={form.tech_stack} onChange={set('tech_stack')}
+                  placeholder="React, Python, TensorFlow (comma separated)" />
               </label>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <label>
                   GitHub URL
-                  <input
-                    type="url"
-                    value={form.github_url}
-                    onChange={set('github_url')}
-                    placeholder="https://github.com/..."
-                  />
+                  <input type="url" value={form.github_url} onChange={set('github_url')} placeholder="https://github.com/..." />
                 </label>
                 <label>
                   Demo / Live URL
-                  <input
-                    type="url"
-                    value={form.demo_url}
-                    onChange={set('demo_url')}
-                    placeholder="https://..."
-                  />
+                  <input type="url" value={form.demo_url} onChange={set('demo_url')} placeholder="https://..." />
                 </label>
               </div>
-
               <label>
                 Google Colab URL
-                <input
-                  type="url"
-                  value={form.colab_url}
-                  onChange={set('colab_url')}
-                  placeholder="https://colab.research.google.com/..."
-                />
+                <input type="url" value={form.colab_url} onChange={set('colab_url')} placeholder="https://colab.research.google.com/..." />
               </label>
-
               <label>
                 Lessons learned / Notes
-                <textarea
-                  rows={3}
-                  value={form.lessons_learned}
-                  onChange={set('lessons_learned')}
-                  placeholder="What did you learn? What would you do differently?"
-                />
+                <textarea rows={3} value={form.lessons_learned} onChange={set('lessons_learned')}
+                  placeholder="What did you learn? What would you do differently?" />
               </label>
-
-              {error && (
-                <span style={{ color: '#f87171', fontSize: '0.85rem' }}>{error}</span>
-              )}
+              {error && <span style={{ color: '#f87171', fontSize: '0.85rem' }}>{error}</span>}
             </div>
-
             <div className="tr-modal-actions">
               <button className="secondary-button" onClick={closeModal}>Cancel</button>
               <button className="primary-button" onClick={handleSave} disabled={isSaving}>
@@ -349,320 +333,198 @@ export function ProjectsPage() {
   );
 }
 
-/* ─── Section ─────────────────────────────────────────────────────────────── */
+/* ─── Project card ──────────────────────────────────────────────────────────────────── */
 
-function ProjectSection({
-  title,
-  subtitle,
-  accentColor,
-  projects,
-  onEdit,
-  onDelete,
+function ProjectCard({
+  project, isActive, onClick,
 }: {
-  title: string;
-  subtitle: string;
-  accentColor: string;
-  projects: Project[];
-  onEdit: (p: Project) => void;
-  onDelete: (id: string) => void;
+  project: Project;
+  isActive: boolean;
+  onClick: () => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const cat      = CATEGORY_CONFIG[project.category ?? 'personal'];
+  const pri      = PRIORITY_CONFIG[project.priority ?? 'medium'];
+  const phase    = getPhase(project.status);
+  const phaseCfg = PHASE_CONFIG[phase];
 
   return (
-    <section style={{ marginBottom: '4px' }}>
-      <button
-        type="button"
-        onClick={() => setCollapsed(v => !v)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          width: '100%',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '8px 0',
-          marginBottom: collapsed ? '0' : '12px',
-          borderBottom: collapsed ? 'none' : `2px solid ${accentColor}22`,
-        }}
-      >
-        <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--tk-text)' }}>
-          {title}
+    <button
+      className={`pj-card${isActive ? ' pj-card--active' : ''}`}
+      style={{ '--cat-color': cat.color } as React.CSSProperties}
+      onClick={onClick}
+    >
+      <div className="pj-card-priority" style={{ background: pri.dot }} title={`${pri.label} priority`} />
+      <div className="pj-card-name">{project.name}</div>
+      <div className="pj-card-meta">
+        <span className="pj-card-phase" style={{ color: phaseCfg.color, background: `${phaseCfg.color}18` }}>
+          {phaseCfg.label}
         </span>
-        <span
-          style={{
-            fontSize: '0.78rem',
-            padding: '1px 8px',
-            borderRadius: '99px',
-            backgroundColor: `${accentColor}20`,
-            color: accentColor,
-            fontWeight: 600,
-          }}
-        >
-          {projects.length}
+        <span className="pj-card-cat" style={{ color: cat.color, background: cat.bg }}>
+          {cat.icon}&nbsp;{cat.label}
         </span>
-        <span
-          style={{
-            fontSize: '0.82rem',
-            color: 'var(--tk-text-muted)',
-            marginLeft: '2px',
-            flex: 1,
-            textAlign: 'left',
-          }}
-        >
-          {subtitle}
-        </span>
-        {collapsed
-          ? <ChevronDown size={15} style={{ color: 'var(--tk-text-muted)' }} />
-          : <ChevronUp   size={15} style={{ color: 'var(--tk-text-muted)' }} />}
-      </button>
-
-      {!collapsed && (
-        projects.length === 0 ? (
-          <p style={{ fontSize: '0.85rem', color: 'var(--tk-text-muted)', padding: '4px 0 16px' }}>
-            No projects here yet — click <strong>New Project</strong> to add one.
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '8px' }}>
-            {projects.map(p => (
-              <ProjectCard key={p.id} project={p} onEdit={onEdit} onDelete={onDelete} />
-            ))}
-          </div>
-        )
+      </div>
+      {project.description && (
+        <p className="pj-card-desc">{project.description}</p>
       )}
-    </section>
+      {project.tech_stack.length > 0 && (
+        <div className="pj-card-tags">
+          {project.tech_stack.slice(0, 4).map(t => (
+            <span key={t} className="pj-card-tag">{t}</span>
+          ))}
+          {project.tech_stack.length > 4 && (
+            <span className="pj-card-tag pj-card-tag--more">+{project.tech_stack.length - 4}</span>
+          )}
+        </div>
+      )}
+      <div className="pj-card-footer">
+        <div className="pj-card-icons">
+          {project.github_url  && <Github size={13} />}
+          {project.demo_url    && <ExternalLink size={13} />}
+          {project.colab_url   && <ExternalLink size={13} />}
+        </div>
+        {project.deadline && (
+          <span className="pj-card-deadline">
+            <Calendar size={11} />&nbsp;{project.deadline}
+          </span>
+        )}
+      </div>
+    </button>
   );
 }
 
-/* ─── Card ────────────────────────────────────────────────────────────────── */
+/* ─── Detail drawer ──────────────────────────────────────────────────────────────────── */
 
-function ProjectCard({
-  project,
-  onEdit,
-  onDelete,
+function ProjectDetail({
+  project, onEdit, onDelete, onClose,
 }: {
   project: Project;
   onEdit: (p: Project) => void;
   onDelete: (id: string) => void;
+  onClose: () => void;
 }) {
-  const cat = CATEGORY_CONFIG[project.category ?? 'personal'];
-  const pri = PRIORITY_CONFIG[project.priority ?? 'medium'];
-  const [detailOpen, setDetailOpen] = useState(false);
+  const cat      = CATEGORY_CONFIG[project.category ?? 'personal'];
+  const pri      = PRIORITY_CONFIG[project.priority ?? 'medium'];
+  const phase    = getPhase(project.status);
+  const phaseCfg = PHASE_CONFIG[phase];
 
   return (
-    <article className="glass-card entity-card" style={{ position: 'relative' }}>
-      {/* Actions */}
-      <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '4px' }}>
-        <button
-          type="button"
-          onClick={() => setDetailOpen(true)}
-          title="View details"
-          style={{
-            padding: '4px 6px',
-            borderRadius: '5px',
-            border: '1px solid var(--tk-border)',
-            background: 'var(--tk-surface-2)',
-            cursor: 'pointer',
-            color: 'var(--tk-text-muted)',
-          }}
-        >
-          <Info size={12} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onEdit(project)}
-          style={{
-            padding: '4px 6px',
-            borderRadius: '5px',
-            border: '1px solid var(--tk-border)',
-            background: 'var(--tk-surface-2)',
-            cursor: 'pointer',
-            color: 'var(--tk-text-muted)',
-          }}
-        >
-          <Pencil size={12} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(project.id)}
-          style={{
-            padding: '4px 6px',
-            borderRadius: '5px',
-            border: '1px solid var(--tk-border)',
-            background: 'var(--tk-surface-2)',
-            cursor: 'pointer',
-            color: '#f87171',
-          }}
-        >
-          <Trash2 size={12} />
-        </button>
-      </div>
+    <div className="pj-detail-inner">
 
-      {/* Name + badges */}
-      <div style={{ paddingRight: '88px' }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: '0.97rem', fontWeight: 600 }}>
-          {project.name}
-        </h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '2px 8px',
-              borderRadius: '99px',
-              fontSize: '0.73rem',
-              fontWeight: 600,
-              backgroundColor: cat.bg,
-              color: cat.color,
-            }}
-          >
-            {cat.icon} {cat.label}
-          </span>
-          <span
-            style={{
-              padding: '2px 8px',
-              borderRadius: '99px',
-              fontSize: '0.73rem',
-              fontWeight: 600,
-              backgroundColor: pri.bg,
-              color: pri.color,
-            }}
-          >
-            {pri.label} priority
-          </span>
-          {project.deadline && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '2px 8px',
-                borderRadius: '99px',
-                fontSize: '0.73rem',
-                backgroundColor: 'rgba(99,102,241,0.1)',
-                color: '#818cf8',
-              }}
-            >
-              <Calendar size={10} /> {project.deadline}
-            </span>
-          )}
+      {/* Top bar */}
+      <div className="pj-drawer-topbar">
+        <div className="pj-detail-phase" style={{
+          color: phaseCfg.color,
+          borderColor: `${phaseCfg.color}30`,
+          background: `${phaseCfg.color}10`,
+        }}>
+          {phaseCfg.label}
         </div>
-      </div>
-
-      {/* Missions */}
-      <MissionsPanel projectId={project.id} />
-
-      {/* Detail modal */}
-      {detailOpen && (
-        <ProjectDetailModal project={project} onClose={() => setDetailOpen(false)} />
-      )}
-    </article>
-  );
-}
-
-/* ─── Project Detail Modal ───────────────────────────────────────────────── */
-
-function ProjectDetailModal({ project, onClose }: { project: Project; onClose: () => void }) {
-  const cat = CATEGORY_CONFIG[project.category ?? 'personal'];
-  const pri = PRIORITY_CONFIG[project.priority ?? 'medium'];
-
-  return (
-    <div className="tr-backdrop" onClick={onClose}>
-      <div
-        className="tr-modal tr-modal--project"
-        onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '600px', maxHeight: '82vh', overflowY: 'auto' }}
-      >
-        <div className="tr-modal-header">
-          <div className="tr-modal-icon"><Info size={15} /></div>
-          <div className="tr-modal-title-block">
-            <strong>{project.name}</strong>
-            <p className="tr-modal-parent">Project details</p>
-          </div>
-          <button className="tr-modal-close" onClick={onClose} aria-label="Close">
+        <div className="pj-drawer-topbar-right">
+          <button className="secondary-button"
+            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+            onClick={() => onEdit(project)}>
+            <Pencil size={13} /> Edit
+          </button>
+          <button className="pj-delete-btn" onClick={() => onDelete(project.id)}>
+            <Trash2 size={13} />
+          </button>
+          <button className="pj-drawer-close-btn" onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>
         </div>
+      </div>
 
-        <div className="tr-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Badges */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '99px', fontSize: '0.73rem', fontWeight: 600, backgroundColor: cat.bg, color: cat.color }}>
-              {cat.icon} {cat.label}
-            </span>
-            <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '0.73rem', fontWeight: 600, backgroundColor: pri.bg, color: pri.color }}>
-              {pri.label} priority
-            </span>
-            {project.deadline && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 8px', borderRadius: '99px', fontSize: '0.73rem', backgroundColor: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
-                <Calendar size={10} /> {project.deadline}
-              </span>
-            )}
-          </div>
+      {/* Name + badges */}
+      <h2 className="pj-detail-name">{project.name}</h2>
+      <div className="pj-detail-badges">
+        <span className="pj-badge" style={{ color: cat.color, background: cat.bg }}>
+          {cat.icon}&nbsp;{cat.label}
+        </span>
+        <span className="pj-badge" style={{ color: pri.color, background: `${pri.dot}18` }}>
+          <span className="pj-badge-dot" style={{ background: pri.dot }} />
+          {pri.label} priority
+        </span>
+        {project.deadline && (
+          <span className="pj-badge" style={{ color: '#818cf8', background: 'rgba(129,140,248,0.1)' }}>
+            <Calendar size={10} />&nbsp;{project.deadline}
+          </span>
+        )}
+      </div>
 
-          {/* Description */}
-          {project.description && (
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--tk-text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</div>
-              <p style={{ fontSize: '0.9rem', lineHeight: 1.68, margin: 0, whiteSpace: 'pre-wrap', direction: 'rtl', textAlign: 'right' }}>{project.description}</p>
+      <div className="pj-detail-body">
+        {project.description && (
+          <section className="pj-section">
+            <h3 className="pj-section-title">Description</h3>
+            <p className="pj-description">{project.description}</p>
+          </section>
+        )}
+        {project.tech_stack.length > 0 && (
+          <section className="pj-section">
+            <h3 className="pj-section-title">Tech Stack</h3>
+            <div className="tag-row">
+              {project.tech_stack.map(tag => (
+                <span key={tag} className="tag-chip">{tag}</span>
+              ))}
             </div>
-          )}
-
-          {/* Tech stack */}
-          {project.tech_stack.length > 0 && (
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--tk-text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tech Stack</div>
-              <div className="tag-row">
-                {project.tech_stack.map(tag => <span key={tag} className="tag-chip">{tag}</span>)}
-              </div>
-            </div>
-          )}
-
-          {/* Lessons learned */}
-          {project.lessons_learned && (
-            <div style={{ padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.18)' }}>
-              <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '6px', color: '#34d399' }}>💡 Lessons learned</strong>
-              <p style={{ fontSize: '0.88rem', lineHeight: 1.62, margin: 0, whiteSpace: 'pre-wrap' }}>{project.lessons_learned}</p>
-            </div>
-          )}
-
-          {/* Links */}
-          {(project.github_url || project.colab_url || project.demo_url) && (
-            <div className="link-row">
+          </section>
+        )}
+        {(project.github_url || project.demo_url || project.colab_url) && (
+          <section className="pj-section">
+            <h3 className="pj-section-title">Links</h3>
+            <div className="pj-links">
               {project.github_url && (
-                <a href={project.github_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem' }}>
+                <a href={project.github_url} target="_blank" rel="noreferrer" className="pj-link">
                   <Github size={14} /> GitHub
                 </a>
               )}
               {project.demo_url && (
-                <a href={project.demo_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem' }}>
+                <a href={project.demo_url} target="_blank" rel="noreferrer" className="pj-link">
                   <ExternalLink size={14} /> Demo
                 </a>
               )}
               {project.colab_url && (
-                <a href={project.colab_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem' }}>
+                <a href={project.colab_url} target="_blank" rel="noreferrer" className="pj-link">
                   <ExternalLink size={14} /> Colab
                 </a>
               )}
             </div>
-          )}
-        </div>
+          </section>
+        )}
+        <section className="pj-section">
+          <MissionsPanel projectId={project.id} alwaysOpen />
+        </section>
+        {project.lessons_learned && (
+          <section className="pj-section pj-lessons">
+            <h3 className="pj-section-title" style={{ color: '#34d399' }}>💡 Lessons Learned</h3>
+            <p className="pj-description">{project.lessons_learned}</p>
+          </section>
+        )}
       </div>
     </div>
   );
 }
 
-/* ─── Missions Panel ──────────────────────────────────────────────────────── */
+/* ─── Missions Panel ──────────────────────────────────────────────────────────────────── */
 
-function MissionsPanel({ projectId }: { projectId: string }) {
-  const [open, setOpen]         = useState(false);
+function MissionsPanel({
+  projectId,
+  alwaysOpen = false,
+}: {
+  projectId: string;
+  alwaysOpen?: boolean;
+}) {
+  const [open,     setOpen]     = useState(alwaysOpen);
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [loaded, setLoaded]     = useState(false);
+  const [loaded,   setLoaded]   = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [adding, setAdding]     = useState(false);
+  const [adding,   setAdding]   = useState(false);
 
-  // Lazy-load missions the first time the panel is opened
+  useEffect(() => {
+    setMissions([]);
+    setLoaded(false);
+    if (alwaysOpen) setOpen(true);
+  }, [projectId, alwaysOpen]);
+
   useEffect(() => {
     if (!open || loaded) return;
     listMissions(projectId)
@@ -703,64 +565,46 @@ function MissionsPanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="ms-panel">
-      {/* Toggle header */}
-      <button
-        type="button"
-        className="ms-toggle"
-        onClick={() => setOpen(v => !v)}
-      >
-        <Flag size={12} className="ms-toggle-icon" />
-        <span className="ms-toggle-label">Missions</span>
-        {total > 0 && (
-          <span className="ms-badge">{done}/{total}</span>
-        )}
-        {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-      </button>
-
-      {/* Progress bar */}
+      {alwaysOpen ? (
+        <div className="pj-missions-header">
+          <Flag size={14} style={{ color: '#0099CC', flexShrink: 0 }} />
+          <h3 className="pj-section-title" style={{ margin: 0 }}>Missions</h3>
+          {total > 0 && (
+            <span style={{ fontSize: '0.75rem', color: 'var(--tk-text-muted)', marginLeft: 'auto' }}>
+              {done} / {total} done
+            </span>
+          )}
+        </div>
+      ) : (
+        <button type="button" className="ms-toggle" onClick={() => setOpen(v => !v)}>
+          <Flag size={12} className="ms-toggle-icon" />
+          <span className="ms-toggle-label">Missions</span>
+          {total > 0 && <span className="ms-badge">{done}/{total}</span>}
+          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+      )}
       {open && total > 0 && (
         <div className="ms-progress-track">
-          <div
-            className="ms-progress-fill"
-            style={{ width: `${Math.round((done / total) * 100)}%` }}
-          />
+          <div className="ms-progress-fill" style={{ width: `${Math.round((done / total) * 100)}%` }} />
         </div>
       )}
-
-      {/* Missions list */}
       {open && (
         <div className="ms-body">
           {!loaded && <p className="ms-loading">Loading…</p>}
-
           {loaded && missions.length === 0 && (
             <p className="ms-empty">No missions yet — add your first one below.</p>
           )}
-
           {loaded && missions.map(m => (
             <div key={m.id} className={`ms-row ${m.status === 'done' ? 'ms-row--done' : ''}`}>
-              <button
-                type="button"
-                className="ms-check"
-                onClick={() => handleToggle(m)}
-                title={m.status === 'done' ? 'Mark todo' : 'Mark done'}
-              >
-                {m.status === 'done'
-                  ? <CheckCircle2 size={15} />
-                  : <Circle size={15} />}
+              <button type="button" className="ms-check" onClick={() => handleToggle(m)}>
+                {m.status === 'done' ? <CheckCircle2 size={15} /> : <Circle size={15} />}
               </button>
               <span className="ms-title">{m.title}</span>
-              <button
-                type="button"
-                className="ms-delete"
-                onClick={() => handleDelete(m.id)}
-                title="Delete mission"
-              >
+              <button type="button" className="ms-delete" onClick={() => handleDelete(m.id)}>
                 <X size={11} />
               </button>
             </div>
           ))}
-
-          {/* Add new mission */}
           <div className="ms-add-row">
             <input
               className="ms-input"
