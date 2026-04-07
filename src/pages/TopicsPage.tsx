@@ -612,12 +612,14 @@ except Exception:
         py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
         py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
         // Override plt.show() to capture plots as base64 PNGs
+        await py.loadPackagesFromImports(block.code);
         await py.runPythonAsync(`
 _plot_images = []
 try:
     import matplotlib as _mpl
-    _mpl.use('Agg')
     import matplotlib.pyplot as _plt
+    _plt.close('all')
+    _mpl.use('Agg')
     import io as _io, base64 as _b64
     def _show_capture(*a, **kw):
         buf = _io.BytesIO()
@@ -629,7 +631,6 @@ try:
 except ImportError:
     pass
         `);
-        await py.loadPackagesFromImports(block.code);
         let exitCode = 0;
         try {
           await py.runPythonAsync(block.code);

@@ -241,12 +241,14 @@ function NoteCard({ note, accentColor }: { note: Note; accentColor: string }) {
         let stdout = ''; let stderr = '';
         py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
         py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
+        await py.loadPackagesFromImports(code);
         await py.runPythonAsync(`
 _plot_images = []
 try:
     import matplotlib as _mpl
-    _mpl.use('Agg')
     import matplotlib.pyplot as _plt
+    _plt.close('all')
+    _mpl.use('Agg')
     import io as _io, base64 as _b64
     def _show_capture(*a, **kw):
         buf = _io.BytesIO()
@@ -258,7 +260,6 @@ try:
 except ImportError:
     pass
         `);
-        await py.loadPackagesFromImports(code);
         let exitCode = 0;
         try { await py.runPythonAsync(code); } catch (e: unknown) { stderr = String(e); exitCode = 1; }
         const rawImages = py.runPython('_plot_images');
