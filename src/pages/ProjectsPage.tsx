@@ -423,7 +423,7 @@ function ProjectSection({
             No projects here yet — click <strong>New Project</strong> to add one.
           </p>
         ) : (
-          <div className="card-grid" style={{ marginBottom: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '8px' }}>
             {projects.map(p => (
               <ProjectCard key={p.id} project={p} onEdit={onEdit} onDelete={onDelete} />
             ))}
