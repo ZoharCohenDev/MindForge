@@ -303,7 +303,7 @@ except ImportError:
         <span style={{ color: accentColor, flexShrink: 0, opacity: 0.8 }}>
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
-        <span style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--gp-note-title)', flex: 1 }}>
+        <span style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--gp-note-title)', flex: 1, direction: 'rtl', textAlign: 'right' }}>
           {note.title}
         </span>
         {hasExtra && (

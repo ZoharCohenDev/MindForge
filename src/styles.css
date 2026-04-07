@@ -1766,6 +1766,8 @@ code {
   color: var(--tk-text);
   flex: 1;
   min-width: 0;
+  direction: rtl;
+  text-align: right;
 }
 
 .tr-view-note-header {
@@ -1782,6 +1784,8 @@ code {
   color: var(--tk-text);
   flex: 1;
   min-width: 0;
+  direction: rtl;
+  text-align: right;
 }
 
 .tr-view-note-actions {
@@ -2066,6 +2070,12 @@ code {
 
 /* RTL for Hebrew explanation textarea */
 .tr-modal textarea:not(.tr-code-input) {
+  direction: rtl;
+  text-align: right;
+}
+
+/* RTL for Hebrew title input */
+.tr-modal input {
   direction: rtl;
   text-align: right;
 }
