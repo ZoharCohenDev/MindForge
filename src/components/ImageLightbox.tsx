@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 export type LightboxImage = { url: string; name: string };
@@ -26,7 +27,7 @@ export function ImageLightbox({ images, index, onClose, onNav }: Props) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
-  return (
+  return createPortal(
     <div className="lb-backdrop" onClick={onClose}>
       {/* Close */}
       <button className="lb-close" onClick={onClose} title="Close (Esc)">
@@ -86,5 +87,5 @@ export function ImageLightbox({ images, index, onClose, onNav }: Props) {
         </div>
       )}
     </div>
-  );
+  , document.body);
 }

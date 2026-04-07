@@ -2,6 +2,7 @@ import { Brain, FolderKanban, LayoutDashboard, Moon, Network, LogOut, Sun } from
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import logo from '../assets/logo.png';
 
 const navigation = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,11 +19,7 @@ export function Sidebar() {
     <aside className="sidebar glass-card">
       <div>
         <div className="sidebar-brand">
-          <div className="brand-icon">L</div>
-          <div>
-            <strong>MindForge</strong>
-            <p>{session?.user.email}</p>
-          </div>
+          <img src={logo} alt="MindForge" className="brand-logo" />
         </div>
 
         <nav className="sidebar-nav">

@@ -382,9 +382,16 @@ except ImportError:
                   <pre className="cb-output-pre">
                     {(blockOutputs[idx].stdout + (blockOutputs[idx].stdout && blockOutputs[idx].stderr ? '\n' : '') + blockOutputs[idx].stderr).trimEnd() || '(no output)'}
                   </pre>
-                  {blockOutputs[idx].plotImages?.map((img, i) => (
-                    <img key={i} src={`data:image/png;base64,${img}`} alt={`plot ${i + 1}`} style={{ maxWidth: '100%', marginTop: '8px', borderRadius: '4px', display: 'block' }} />
-                  ))}
+                  {blockOutputs[idx].plotImages?.map((img, i) => {
+                    const allPlots = blockOutputs[idx].plotImages ?? [];
+                    const plotList: LightboxImage[] = allPlots.map((p, pi) => ({ url: `data:image/png;base64,${p}`, name: `Plot ${pi + 1}` }));
+                    return (
+                      <button key={i} type="button" className="lb-thumb-btn" style={{ marginTop: '8px' }}
+                        onClick={() => setLightbox({ images: plotList, index: i })}>
+                        <img src={`data:image/png;base64,${img}`} alt={`plot ${i + 1}`} style={{ maxWidth: '100%', borderRadius: '4px', display: 'block' }} />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
