@@ -12,7 +12,7 @@ const navigation = [
 ];
 
 export function Sidebar() {
-  const { signOut, session } = useAuth();
+  const { signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   return (
