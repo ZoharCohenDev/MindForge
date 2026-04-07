@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Code2, Network, Play, X } from 'lucide-react';
 import { listTopicNotes, listTopics } from '../lib/dataApi';
 import type { Note, Topic, TreeType } from '../types';
+import { ImageLightbox, type LightboxImage } from '../components/ImageLightbox';
 
 // ── Pyodide (client-side Python) — loaded once, shared across notes ──────────
 declare global { interface Window { loadPyodide: (cfg: { indexURL: string }) => Promise<any>; } }
@@ -226,6 +227,7 @@ function NoteCard({ note, accentColor }: { note: Note; accentColor: string }) {
   const [open, setOpen] = useState(true);
   const [runningIdx, setRunningIdx] = useState<number | null>(null);
   const [blockOutputs, setBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
+  const [lightbox, setLightbox] = useState<{ images: LightboxImage[]; index: number } | null>(null);;
   const hasExtra = !!(note.code_example || (note.code_blocks?.length ?? 0) > 0);
 
   const handleRunCode = async (code: string, language: string, idx: number) => {
@@ -391,20 +393,31 @@ except ImportError:
       {/* Attachments */}
       {note.attachments && note.attachments.length > 0 && open && (
         <div className="tr-view-attachments" style={{ padding: '0 12px 11px' }}>
-          {note.attachments.map((att, idx) => (
-            att.type === 'image' ? (
-              <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-img-wrap">
-                <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
+          {note.attachments.map((att, idx) => {
+            const imgList: LightboxImage[] = (note.attachments ?? []).filter(a => a.type === 'image').map(a => ({ url: a.url, name: a.name }));
+            return att.type === 'image' ? (
+              <div key={idx} className="tr-view-attachment-img-wrap">
+                <button type="button" className="lb-thumb-btn" onClick={() => setLightbox({ images: imgList, index: imgList.findIndex(i => i.url === att.url) })} title="View full size">
+                  <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
+                </button>
                 <span className="tr-view-attachment-label">{att.name}</span>
-              </a>
+              </div>
             ) : (
               <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-pdf">
                 <span className="tr-attachment-pdf-icon">PDF</span>
                 <span className="tr-view-attachment-label">{att.name}</span>
               </a>
-            )
-          ))}
+            );
+          })}
         </div>
+      )}
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onNav={(i) => setLightbox(prev => prev ? { ...prev, index: i } : null)}
+        />
       )}
     </div>
   );

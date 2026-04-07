@@ -33,6 +33,8 @@ import { SEED_TREES, getSeedTreeBySlug } from "../data/seedTrees";
 import { useTreeGeneration } from "../lib/useTreeGeneration";
 import { GenerationProgress } from "../components/GenerationProgress";
 import type { Attachment, CodeBlock, Note, SubExpression, Topic, Tree, TreeNode } from "../types";
+import { ImageLightbox } from "../components/ImageLightbox";
+import type { LightboxImage } from "../components/ImageLightbox";
 import {
   sortTreeNodes,
   calcTreeProgress,
@@ -147,6 +149,7 @@ export function TopicsPage() {
   const [pastingToNote, setPastingToNote] = useState(false);
   const [viewRunningIdx, setViewRunningIdx] = useState<number | null>(null);
   const [viewBlockOutputs, setViewBlockOutputs] = useState<Record<number, { stdout: string; stderr: string; exitCode: number; plotImages?: string[] }>>({});
+  const [lightbox, setLightbox] = useState<{ images: LightboxImage[]; index: number } | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<
     | { kind: 'topic'; id: string; label: string }
@@ -1575,20 +1578,27 @@ except ImportError:
                   <div className="tr-attachments-section">
                     {noteAttachments.length > 0 && (
                       <div className="tr-edit-attachments-grid">
-                        {noteAttachments.map((att, idx) => (
-                          <div key={idx} className="tr-edit-attachment-item">
-                            <button
-                              type="button"
-                              className="tr-attachment-remove tr-view-attachment-remove"
-                              onClick={() => setNoteAttachments(prev => prev.filter((_, i) => i !== idx))}
-                              title="Remove"
-                            ><X size={11} /></button>
-                            {att.type === 'image'
-                              ? <img src={att.url} alt={att.name} className="tr-edit-attachment-img" />
-                              : <div className="tr-edit-attachment-pdf"><span className="tr-attachment-pdf-icon">PDF</span><span className="tr-attachment-name">{att.name}</span></div>
-                            }
-                          </div>
-                        ))}
+                        {noteAttachments.map((att, idx) => {
+                          const imgList: LightboxImage[] = noteAttachments
+                            .filter(a => a.type === 'image')
+                            .map(a => ({ url: a.url, name: a.name }));
+                          return (
+                            <div key={idx} className="tr-edit-attachment-item">
+                              <button
+                                type="button"
+                                className="tr-attachment-remove tr-view-attachment-remove"
+                                onClick={() => setNoteAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                title="Remove"
+                              ><X size={11} /></button>
+                              {att.type === 'image'
+                                ? <button type="button" className="lb-thumb-btn" onClick={() => setLightbox({ images: imgList, index: imgList.findIndex(i => i.url === att.url) })} title="View full size">
+                                    <img src={att.url} alt={att.name} className="tr-edit-attachment-img" />
+                                  </button>
+                                : <div className="tr-edit-attachment-pdf"><span className="tr-attachment-pdf-icon">PDF</span><span className="tr-attachment-name">{att.name}</span></div>
+                              }
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     <span className="tr-paste-hint">
@@ -1709,35 +1719,45 @@ except ImportError:
                           )}
                           {activeNote.attachments && activeNote.attachments.length > 0 && (
                             <div className="tr-view-attachments">
-                              {activeNote.attachments.map((att, idx) => (
-                                att.type === 'image' ? (
-                                  <div key={idx} className="tr-view-attachment-img-wrap">
-                                    <button
-                                      type="button"
-                                      className="tr-attachment-remove tr-view-attachment-remove"
-                                      onClick={() => void handleRemoveAttachmentFromActiveNote(activeNote, idx)}
-                                      title="Remove"
-                                    ><X size={11} /></button>
-                                    <a href={att.url} target="_blank" rel="noopener noreferrer">
-                                      <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
-                                    </a>
-                                    <span className="tr-view-attachment-label">{att.name}</span>
-                                  </div>
-                                ) : (
-                                  <div key={idx} style={{ position: 'relative' }}>
-                                    <button
-                                      type="button"
-                                      className="tr-attachment-remove tr-view-attachment-remove"
-                                      onClick={() => void handleRemoveAttachmentFromActiveNote(activeNote, idx)}
-                                      title="Remove"
-                                    ><X size={11} /></button>
-                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-pdf">
-                                      <span className="tr-attachment-pdf-icon">PDF</span>
+                              {(() => {
+                                const imgList: LightboxImage[] = (activeNote.attachments ?? [])
+                                  .filter(a => a.type === 'image')
+                                  .map(a => ({ url: a.url, name: a.name }));
+                                return activeNote.attachments!.map((att, idx) => (
+                                  att.type === 'image' ? (
+                                    <div key={idx} className="tr-view-attachment-img-wrap">
+                                      <button
+                                        type="button"
+                                        className="tr-attachment-remove tr-view-attachment-remove"
+                                        onClick={() => void handleRemoveAttachmentFromActiveNote(activeNote, idx)}
+                                        title="Remove"
+                                      ><X size={11} /></button>
+                                      <button
+                                        type="button"
+                                        className="lb-thumb-btn"
+                                        onClick={() => setLightbox({ images: imgList, index: imgList.findIndex(i => i.url === att.url) })}
+                                        title="View full size"
+                                      >
+                                        <img src={att.url} alt={att.name} className="tr-view-attachment-img" />
+                                      </button>
                                       <span className="tr-view-attachment-label">{att.name}</span>
-                                    </a>
-                                  </div>
-                                )
-                              ))}
+                                    </div>
+                                  ) : (
+                                    <div key={idx} style={{ position: 'relative' }}>
+                                      <button
+                                        type="button"
+                                        className="tr-attachment-remove tr-view-attachment-remove"
+                                        onClick={() => void handleRemoveAttachmentFromActiveNote(activeNote, idx)}
+                                        title="Remove"
+                                      ><X size={11} /></button>
+                                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="tr-view-attachment-pdf">
+                                        <span className="tr-attachment-pdf-icon">PDF</span>
+                                        <span className="tr-view-attachment-label">{att.name}</span>
+                                      </a>
+                                    </div>
+                                  )
+                                ));
+                              })()}
                             </div>
                           )}
                           <span className="tr-paste-hint">
@@ -1828,6 +1848,14 @@ except ImportError:
             </div>
           </div>
         </div>
+      )}
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onNav={(i) => setLightbox(prev => prev ? { ...prev, index: i } : null)}
+        />
       )}
     </div>
   );
