@@ -30,20 +30,41 @@ async function getPyodide(): Promise<any> {
   return _pyodideLoading;
 }
 
+const PYODIDE_BUNDLED_G = new Set([
+  'numpy', 'pandas', 'matplotlib', 'scipy', 'sklearn', 'PIL', 'sympy',
+  'networkx', 'statsmodels', 'nltk', 'cryptography', 'lxml', 'openpyxl',
+  'joblib', 'packaging', 'pyparsing', 'pytz', 'dateutil', 'six',
+  'requests', 'attr', 'attrs', 'yaml', 'pydantic', 'sqlalchemy', 'Pillow',
+]);
+const STDLIB_MODS_G = new Set([
+  '__future__', 'os', 'sys', 'io', 're', 'json', 'math', 'random', 'time',
+  'datetime', 'collections', 'itertools', 'functools', 'pathlib', 'typing',
+  'abc', 'copy', 'string', 'struct', 'base64', 'hashlib', 'urllib', 'http',
+  'email', 'html', 'xml', 'csv', 'sqlite3', 'logging', 'unittest', 'argparse',
+  'ast', 'inspect', 'contextlib', 'dataclasses', 'enum', 'warnings',
+  'traceback', 'operator', 'bisect', 'heapq', 'queue', 'array', 'decimal',
+  'fractions', 'statistics', 'cmath', 'numbers', 'pprint', 'textwrap',
+  'shutil', 'glob', 'tempfile', 'platform', 'signal', 'gc', 'weakref',
+]);
+const MICROPIP_MAP_G: Record<string, string> = {
+  seaborn: 'seaborn', plotly: 'plotly', xgboost: 'xgboost',
+  lightgbm: 'lightgbm', bokeh: 'bokeh', altair: 'altair',
+  sklearn: 'scikit-learn', cv2: 'opencv-python',
+  bs4: 'beautifulsoup4', dotenv: 'python-dotenv', PIL: 'Pillow',
+};
+
 async function loadPythonPackages(py: any, code: string): Promise<void> {
   await py.loadPackagesFromImports(code);
-  const names = [...new Set(
+  const importedNames = [...new Set(
     [...code.matchAll(/^\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm)].map(m => m[1])
-  )].filter(n => !['__future__', 'os', 'sys', 'io', 're', 'json', 'math',
-    'random', 'time', 'datetime', 'collections', 'itertools', 'functools',
-    'pathlib', 'typing', 'abc', 'copy', 'string', 'struct', 'base64'].includes(n));
-  if (names.length > 0) {
-    await py.runPythonAsync(
-      `import micropip as _mp, sys as _sys\n` +
-      `_missing = [p for p in ${JSON.stringify(names)} if p not in _sys.modules]\n` +
-      `if _missing:\n    await _mp.install(_missing, keep_going=True)\n`
-    );
-  }
+  )].filter(n => !STDLIB_MODS_G.has(n) && !PYODIDE_BUNDLED_G.has(n));
+  if (importedNames.length === 0) return;
+  const pypiNames = [...new Set(importedNames.map(n => MICROPIP_MAP_G[n] ?? n))];
+  await py.runPythonAsync(
+    `import micropip as _mp, sys as _sys\n` +
+    `_to_install = [p for p in ${JSON.stringify(pypiNames)} if p.replace('-','_').replace('.','_') not in _sys.modules]\n` +
+    `if _to_install:\n    await _mp.install(_to_install, keep_going=True)\n`
+  );
 }
 
 const RUNNABLE_LANGS = new Set(['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','Bash']);

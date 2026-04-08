@@ -93,21 +93,56 @@ async function getPyodide(): Promise<any> {
   return _pyodideLoading;
 }
 
+// Packages bundled in Pyodide — loadPackagesFromImports handles these; never pass to micropip
+const PYODIDE_BUNDLED = new Set([
+  'numpy', 'pandas', 'matplotlib', 'scipy', 'sklearn', 'PIL', 'sympy',
+  'networkx', 'statsmodels', 'nltk', 'cryptography', 'lxml', 'openpyxl',
+  'joblib', 'packaging', 'pyparsing', 'pytz', 'dateutil', 'six',
+  'requests', 'attr', 'attrs', 'yaml', 'pydantic', 'sqlalchemy',
+  'shapely', 'pyproj', 'Pillow',
+]);
+// Python stdlib top-level names to skip entirely
+const STDLIB_MODS = new Set([
+  '__future__', 'os', 'sys', 'io', 're', 'json', 'math', 'random', 'time',
+  'datetime', 'collections', 'itertools', 'functools', 'pathlib', 'typing',
+  'abc', 'copy', 'string', 'struct', 'base64', 'hashlib', 'urllib', 'http',
+  'email', 'html', 'xml', 'csv', 'sqlite3', 'logging', 'unittest', 'argparse',
+  'ast', 'inspect', 'contextlib', 'dataclasses', 'enum', 'warnings',
+  'traceback', 'operator', 'bisect', 'heapq', 'queue', 'array', 'decimal',
+  'fractions', 'statistics', 'cmath', 'numbers', 'pprint', 'textwrap',
+  'shutil', 'glob', 'fnmatch', 'tempfile', 'platform', 'signal', 'gc',
+  'weakref', 'types', 'dis', 'token', 'tokenize', 'builtins', 'code',
+]);
+// Import name → correct PyPI package name for micropip
+const MICROPIP_MAP: Record<string, string> = {
+  seaborn: 'seaborn',
+  plotly: 'plotly',
+  xgboost: 'xgboost',
+  lightgbm: 'lightgbm',
+  bokeh: 'bokeh',
+  altair: 'altair',
+  sklearn: 'scikit-learn',
+  cv2: 'opencv-python',
+  bs4: 'beautifulsoup4',
+  dotenv: 'python-dotenv',
+  PIL: 'Pillow',
+};
+
 async function loadPythonPackages(py: any, code: string): Promise<void> {
+  // Step 1: load Pyodide-bundled packages (numpy, pandas, sklearn, etc.)
   await py.loadPackagesFromImports(code);
-  // micropip fallback for packages not bundled in Pyodide (e.g. seaborn)
-  const names = [...new Set(
+  // Step 2: collect import names not covered by Pyodide
+  const importedNames = [...new Set(
     [...code.matchAll(/^\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm)].map(m => m[1])
-  )].filter(n => !['__future__', 'os', 'sys', 'io', 're', 'json', 'math',
-    'random', 'time', 'datetime', 'collections', 'itertools', 'functools',
-    'pathlib', 'typing', 'abc', 'copy', 'string', 'struct', 'base64'].includes(n));
-  if (names.length > 0) {
-    await py.runPythonAsync(
-      `import micropip as _mp, sys as _sys\n` +
-      `_missing = [p for p in ${JSON.stringify(names)} if p not in _sys.modules]\n` +
-      `if _missing:\n    await _mp.install(_missing, keep_going=True)\n`
-    );
-  }
+  )].filter(n => !STDLIB_MODS.has(n) && !PYODIDE_BUNDLED.has(n));
+  if (importedNames.length === 0) return;
+  // Step 3: map to correct PyPI names, fall back to the import name itself
+  const pypiNames = [...new Set(importedNames.map(n => MICROPIP_MAP[n] ?? n))];
+  await py.runPythonAsync(
+    `import micropip as _mp, sys as _sys\n` +
+    `_to_install = [p for p in ${JSON.stringify(pypiNames)} if p.replace('-','_').replace('.','_') not in _sys.modules]\n` +
+    `if _to_install:\n    await _mp.install(_to_install, keep_going=True)\n`
+  );
 }
 
 // ── Module-level constants (stable across renders) ─────────────────────────
