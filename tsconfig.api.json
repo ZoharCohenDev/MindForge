@@ -4,6 +4,7 @@
     "lib": ["ES2022"],
     "module": "CommonJS",
     "moduleResolution": "Node",
+    "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
