@@ -41,6 +41,7 @@ import {
   makeExpandToDepth,
 } from "../lib/treeUtils";
 import { useTreeEditor } from "../lib/useTreeEditor";
+import { getAuthHeaders } from "../lib/supabase";
 
 type ModalState =
   | { type: "subject"; topic: Topic }
@@ -568,7 +569,7 @@ except Exception:
       const topicPath = getTopicPath(modal.topic.id, editor.topics);
       const response = await fetch('/api/generate-explanation', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ topicTitle: modal.topic.title, topicPath }),
       });
       if (!response.ok) {
@@ -696,7 +697,7 @@ except ImportError:
     try {
       const response = await fetch('/api/convert-code', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           code: block.code,
           sourceLanguage: block.language,

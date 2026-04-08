@@ -7,6 +7,7 @@
  */
 
 import type { SeedNode } from '../types';
+import { getAuthHeaders } from './supabase';
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ export async function generateTreeFromGoal(
 ): Promise<GeneratedTreePayload> {
   const resp = await fetch('/api/generate-tree', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ careerGoal }),
   });
 

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { SeedNode } from '../types';
+import { getAuthHeaders } from './supabase';
 
 /* ── Types ───────────────────────────────────────────────────────────── */
 
@@ -87,7 +88,7 @@ export function useTreeGeneration() {
     // ── Start the fetch immediately ──
     const fetchPromise = fetch('/api/generate-tree', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ careerGoal }),
       signal: ctrl.signal,
     });
