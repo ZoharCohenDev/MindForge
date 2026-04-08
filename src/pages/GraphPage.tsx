@@ -23,11 +23,29 @@ async function getPyodide(): Promise<any> {
       });
     }
     const py = await window.loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/' });
+    await py.loadPackage('micropip');
     _pyodideInstance = py;
     return py;
   })();
   return _pyodideLoading;
 }
+
+async function loadPythonPackages(py: any, code: string): Promise<void> {
+  await py.loadPackagesFromImports(code);
+  const names = [...new Set(
+    [...code.matchAll(/^\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm)].map(m => m[1])
+  )].filter(n => !['__future__', 'os', 'sys', 'io', 're', 'json', 'math',
+    'random', 'time', 'datetime', 'collections', 'itertools', 'functools',
+    'pathlib', 'typing', 'abc', 'copy', 'string', 'struct', 'base64'].includes(n));
+  if (names.length > 0) {
+    await py.runPythonAsync(
+      `import micropip as _mp, sys as _sys\n` +
+      `_missing = [p for p in ${JSON.stringify(names)} if p not in _sys.modules]\n` +
+      `if _missing:\n    await _mp.install(_missing, keep_going=True)\n`
+    );
+  }
+}
+
 const RUNNABLE_LANGS = new Set(['Python','JavaScript','TypeScript','Java','C++','C#','Go','Rust','Bash']);
 
 // ── Data types ────────────────────────────────────────────────────────────────
@@ -241,7 +259,7 @@ function NoteCard({ note, accentColor }: { note: Note; accentColor: string }) {
         let stdout = ''; let stderr = '';
         py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
         py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
-        await py.loadPackagesFromImports(code);
+        await loadPythonPackages(py, code);
         await py.runPythonAsync(`
 _plot_images = []
 try:

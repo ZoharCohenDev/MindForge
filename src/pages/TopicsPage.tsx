@@ -86,10 +86,28 @@ async function getPyodide(): Promise<any> {
       });
     }
     const py = await window.loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/' });
+    await py.loadPackage('micropip');
     _pyodideInstance = py;
     return py;
   })();
   return _pyodideLoading;
+}
+
+async function loadPythonPackages(py: any, code: string): Promise<void> {
+  await py.loadPackagesFromImports(code);
+  // micropip fallback for packages not bundled in Pyodide (e.g. seaborn)
+  const names = [...new Set(
+    [...code.matchAll(/^\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm)].map(m => m[1])
+  )].filter(n => !['__future__', 'os', 'sys', 'io', 're', 'json', 'math',
+    'random', 'time', 'datetime', 'collections', 'itertools', 'functools',
+    'pathlib', 'typing', 'abc', 'copy', 'string', 'struct', 'base64'].includes(n));
+  if (names.length > 0) {
+    await py.runPythonAsync(
+      `import micropip as _mp, sys as _sys\n` +
+      `_missing = [p for p in ${JSON.stringify(names)} if p not in _sys.modules]\n` +
+      `if _missing:\n    await _mp.install(_missing, keep_going=True)\n`
+    );
+  }
 }
 
 // ── Module-level constants (stable across renders) ─────────────────────────
@@ -500,7 +518,7 @@ export function TopicsPage() {
         let stderr = '';
         py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
         py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
-        await py.loadPackagesFromImports(code);
+        await loadPythonPackages(py, code);
         py.runPython(`
 import sys, io, base64, json
 _plot_images = []
@@ -615,7 +633,7 @@ except Exception:
         py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
         py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
         // Override plt.show() to capture plots as base64 PNGs
-        await py.loadPackagesFromImports(block.code);
+        await loadPythonPackages(py, block.code);
         await py.runPythonAsync(`
 _plot_images = []
 try:
