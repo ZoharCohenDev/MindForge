@@ -42,7 +42,7 @@ import {
 } from "../lib/treeUtils";
 import { useTreeEditor } from "../lib/useTreeEditor";
 import { getAuthHeaders } from "../lib/supabase";
-import { BlockMath } from 'react-katex';
+import katex from 'katex';
 
 type ModalState =
   | { type: "subject"; topic: Topic }
@@ -1707,9 +1707,16 @@ except ImportError:
                             </div>
                           )}
                           {activeNote.math_expression && (
-                            <div className="tr-view-note-math">
-                              <BlockMath math={activeNote.math_expression} />
-                            </div>
+                            <div
+                              className="tr-view-note-math"
+                              dangerouslySetInnerHTML={{
+                                __html: katex.renderToString(activeNote.math_expression, {
+                                  displayMode: true,
+                                  throwOnError: false,
+                                  output: 'html',
+                                }),
+                              }}
+                            />
                           )}
                           {activeNote.sub_expressions && activeNote.sub_expressions.length > 0 && (
                             <div style={{ marginTop: "10px", padding: "10px", backgroundColor: "rgba(99,102,241,0.08)", borderRadius: "6px" }}>
