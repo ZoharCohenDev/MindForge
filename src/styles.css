@@ -3807,6 +3807,8 @@ code {
   color: var(--tk-text);
   line-height: 1.4;
   min-width: 0;
+  direction: rtl;
+  text-align: right;
 }
 
 .ms-delete {
@@ -3848,6 +3850,8 @@ code {
   color: var(--tk-text);
   outline: none;
   transition: border-color 0.15s ease;
+  direction: rtl;
+  text-align: right;
 }
 
 .ms-input::placeholder {
