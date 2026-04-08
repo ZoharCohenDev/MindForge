@@ -406,6 +406,7 @@ function ProjectDetail({
   const pri      = PRIORITY_CONFIG[project.priority ?? 'medium'];
   const phase    = getPhase(project.status);
   const phaseCfg = PHASE_CONFIG[phase];
+  const [descOpen, setDescOpen] = useState(true);
 
   return (
     <div className="pj-detail-inner">
@@ -454,8 +455,14 @@ function ProjectDetail({
       <div className="pj-detail-body">
         {project.description && (
           <section className="pj-section">
-            <h3 className="pj-section-title">Description</h3>
-            <p className="pj-description">{project.description}</p>
+            <button
+              className="pj-section-toggle"
+              onClick={() => setDescOpen(v => !v)}
+            >
+              <h3 className="pj-section-title">Description</h3>
+              {descOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+            {descOpen && <p className="pj-description">{project.description}</p>}
           </section>
         )}
         {project.tech_stack.length > 0 && (

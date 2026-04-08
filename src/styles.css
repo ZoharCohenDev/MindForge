@@ -5096,6 +5096,25 @@ code {
   gap: 10px;
 }
 
+.pj-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--tk-text-muted);
+  transition: color 0.15s;
+}
+.pj-section-toggle:hover {
+  color: var(--tk-text);
+}
+.pj-section-toggle:hover .pj-section-title {
+  color: var(--tk-text);
+}
+
 .pj-section-title {
   font-size: 0.72rem;
   font-weight: 700;
