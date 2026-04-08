@@ -42,6 +42,7 @@ import {
 } from "../lib/treeUtils";
 import { useTreeEditor } from "../lib/useTreeEditor";
 import { getAuthHeaders } from "../lib/supabase";
+import { BlockMath } from 'react-katex';
 
 type ModalState =
   | { type: "subject"; topic: Topic }
@@ -499,6 +500,7 @@ export function TopicsPage() {
         let stderr = '';
         py.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
         py.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
+        await py.loadPackagesFromImports(code);
         py.runPython(`
 import sys, io, base64, json
 _plot_images = []
@@ -1705,7 +1707,9 @@ except ImportError:
                             </div>
                           )}
                           {activeNote.math_expression && (
-                            <pre className="tr-view-note-code"><code>{activeNote.math_expression}</code></pre>
+                            <div className="tr-view-note-math">
+                              <BlockMath math={activeNote.math_expression} />
+                            </div>
                           )}
                           {activeNote.sub_expressions && activeNote.sub_expressions.length > 0 && (
                             <div style={{ marginTop: "10px", padding: "10px", backgroundColor: "rgba(99,102,241,0.08)", borderRadius: "6px" }}>
