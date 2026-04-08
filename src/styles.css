@@ -3769,6 +3769,7 @@ code {
   padding: 4px 4px;
   border-radius: 6px;
   transition: background 0.1s ease;
+  direction: rtl;
 }
 
 .ms-row:hover {
