@@ -467,33 +467,10 @@ export function TopicsPage() {
         await editor.refresh(true);
         return;
       }
-      if (modal.type === "subject") {
+      if (modal.type === "subject" || modal.type === "concept") {
         const title = childTitle.trim();
         if (!title || !activeTree) return;
-        // Create a sibling at the same depth/parent as the clicked node
-        const siblingCount = editor.topics.filter(
-          (t) => t.parent_id === modal.topic.parent_id,
-        ).length;
-        await createTopic({
-          title,
-          summary: "",
-          parent_id: modal.topic.parent_id,
-          depth: modal.topic.depth,
-          sort_order: siblingCount,
-          status: "not_started",
-          tree_type: activeTree.slug as TreeType,
-          tree_id: activeTree.id,
-        });
-        closeModal();
-        await editor.refresh(true);
-        return;
-      }
-      if (modal.type === "concept") {
-        const title = childTitle.trim();
-        if (!title) return;
-        if (!activeTree) return;
         await editor.addChild(modal.topic, title, activeTree.slug, activeTree.id);
-        // addChild expands the parent; refresh after to load the new node.
         closeModal();
         await editor.refresh(true);
         return;
@@ -881,8 +858,8 @@ except ImportError:
             <ChevronRight size={13} strokeWidth={2.5} />
           </button>
 
-          {/* Done checkbox — only shown for leaf nodes */}
-          {!hasChildren && (
+          {/* Done checkbox — only shown for leaf nodes that are not root subjects */}
+          {!hasChildren && depth > 0 && (
             <button
               type="button"
               className={`tr-check${isDone ? " tr-check-done" : ""}`}
