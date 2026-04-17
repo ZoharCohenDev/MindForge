@@ -906,28 +906,26 @@ except ImportError:
 
           {/* Hover actions */}
           <div className="tr-actions">
-            {hasChildren && (
-              <>
-                <button
-                  type="button"
-                  className="tr-action tr-action-labeled"
-                  onClick={() => openSubjectModal(node)}
-                  title="Add subject"
-                >
-                  <FolderPlus size={11} />
-                  <span>Subject</span>
-                </button>
-                <button
-                  type="button"
-                  className="tr-action tr-action-labeled"
-                  onClick={() => openConceptModal(node)}
-                  title="Add concept"
-                >
-                  <Lightbulb size={11} />
-                  <span>Concept</span>
-                </button>
-              </>
-            )}
+            <>
+              <button
+                type="button"
+                className="tr-action tr-action-labeled"
+                onClick={() => openSubjectModal(node)}
+                title="Add subject"
+              >
+                <FolderPlus size={11} />
+                <span>Subject</span>
+              </button>
+              <button
+                type="button"
+                className="tr-action tr-action-labeled"
+                onClick={() => openConceptModal(node)}
+                title="Add concept"
+              >
+                <Lightbulb size={11} />
+                <span>Concept</span>
+              </button>
+            </>
             <button
               type="button"
               className="tr-action tr-action-labeled"
