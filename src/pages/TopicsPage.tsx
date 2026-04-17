@@ -1364,8 +1364,19 @@ except ImportError:
           <p>
             {hasSeedTemplate
               ? `Click “Load ${activeTree?.name} template” above to populate this tree.`
-              : 'This tree is empty. Add subjects and concepts to get started.'}
+              : 'This tree is empty. Add your first subject to get started.'}
           </p>
+          {!hasSeedTemplate && (
+            <button
+              type="button"
+              className="tr-cmd-btn"
+              style={{ marginTop: '12px' }}
+              onClick={() => { setModal({ type: "add-root" }); setChildTitle(""); }}
+            >
+              <FolderPlus size={13} />
+              Add Subject
+            </button>
+          )}
         </section>
       ) : (
         <section className="glass-card tr-shell">
