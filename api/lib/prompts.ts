@@ -10,19 +10,33 @@ export const SYSTEM_PROMPT =
 /* ── Stage 1: Top-level domain generation ────────────────────────────── */
 
 export function buildDomainsPrompt(role: string): string {
-  return `Identify all top-level technical DOMAINS that a professional "${role}" must master.
+  return `You are given an input that describes a professional role, certification, or learning goal: "${role}".
 
-RULES:
-- Each domain must be a SPECIFIC, NAMED technical area (e.g. "JavaScript", "SQL", "Docker", "Linear Algebra").
-- Do NOT use generic groupings: Foundations, Core Concepts, Basics, Advanced Topics, Career Growth, Overview, Introduction, Best Practices, Hands-on Practice, Core Skills.
-- Include 8–12 domains depending on role breadth.
-- Order roughly from foundational knowledge → specialised / production topics.
+FIRST — carefully analyse the input:
+- Is it a job title? (e.g. "Full Stack Developer", "DevOps Engineer")
+- Is it a certification? (e.g. "AWS Solutions Architect", "Claude Certified Architect")
+- Is it a specialisation or topic? (e.g. "LLM Systems and Agents", "Prompt Engineering")
+- Does it name specific technologies, frameworks, or vendors? (e.g. Claude, MCP, LangChain, Kubernetes)
+
+THEN — identify all top-level technical DOMAINS that someone mastering "${role}" specifically needs to know.
+
+CRITICAL RULES:
+1. Base every domain DIRECTLY on the exact role/certification/topic provided. Do NOT substitute with generic software-engineering domains unless they are genuinely required for THIS specific role.
+2. If the input mentions specific tools, platforms, frameworks, or vendor products (e.g. Claude, MCP, Agents, Kubernetes, React), those must appear as top-level domains.
+3. Each domain must be a CONCRETE, NAMED technical area — not a category wrapper.
+4. Do NOT use generic groupings: Foundations, Core Concepts, Basics, Advanced Topics, Career Growth, Overview, Introduction, Best Practices, Hands-on Practice, Core Skills.
+5. Include 8–12 domains. Order from foundational → specialised / production topics relevant to THIS role.
+
+EXAMPLES of correct domain extraction:
+- "Claude Certified Architect - LLM Systems, Agents, MCP, and Prompt Engineering" → Agent Architecture, Prompt Engineering, MCP (Model Context Protocol), Context Management, Claude API & Models, Tool Use & Function Calling, Multi-Agent Workflows, Guardrails & Safety, Evaluation & Reliability
+- "AWS Solutions Architect" → IAM & Security, EC2 & Compute, S3 & Storage, VPC & Networking, RDS & Databases, Lambda & Serverless, CloudFormation & IaC, High Availability & Disaster Recovery, Cost Optimisation, Monitoring & Observability
+- "Full Stack Developer" → JavaScript, TypeScript, React, Node.js, REST APIs, SQL, Authentication, Docker, CI/CD, Web Security
 
 LANGUAGE: All "description" and "summary" values MUST be written in Hebrew. Keep "name" and "title" values in English (technical terms).
 
 Return JSON:
 {
-  "name": "<role> Roadmap",
+  "name": "<concise roadmap name that reflects the exact role>",
   "description": "<one sentence describing this learning path — in Hebrew>",
   "icon": "<single relevant emoji>",
   "domains": [

@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  createTopic,
   createTopicNote,
   updateTopicNote,
   uploadNoteAttachment,
@@ -32,7 +33,7 @@ import { treeService } from "../lib/treeService";
 import { SEED_TREES, getSeedTreeBySlug } from "../data/seedTrees";
 import { useTreeGeneration } from "../lib/useTreeGeneration";
 import { GenerationProgress } from "../components/GenerationProgress";
-import type { Attachment, CodeBlock, Note, SubExpression, Topic, Tree, TreeNode } from "../types";
+import type { Attachment, CodeBlock, Note, SubExpression, Topic, Tree, TreeNode, TreeType } from "../types";
 import { ImageLightbox } from "../components/ImageLightbox";
 import type { LightboxImage } from "../components/ImageLightbox";
 import {
@@ -45,6 +46,7 @@ import { getAuthHeaders } from "../lib/supabase";
 import katex from 'katex';
 
 type ModalState =
+  | { type: "add-root" }
   | { type: "subject"; topic: Topic }
   | { type: "concept"; topic: Topic }
   | { type: "note"; topic: Topic }
@@ -447,7 +449,46 @@ export function TopicsPage() {
     setIsSavingModal(true);
     editor.setEditorError(null);
     try {
-      if (modal.type === "subject" || modal.type === "concept") {
+      if (modal.type === "add-root") {
+        const title = childTitle.trim();
+        if (!title || !activeTree) return;
+        const rootCount = editor.topics.filter((t) => !t.parent_id).length;
+        await createTopic({
+          title,
+          summary: "",
+          parent_id: null,
+          depth: 0,
+          sort_order: rootCount,
+          status: "not_started",
+          tree_type: activeTree.slug as TreeType,
+          tree_id: activeTree.id,
+        });
+        closeModal();
+        await editor.refresh(true);
+        return;
+      }
+      if (modal.type === "subject") {
+        const title = childTitle.trim();
+        if (!title || !activeTree) return;
+        // Create a sibling at the same depth/parent as the clicked node
+        const siblingCount = editor.topics.filter(
+          (t) => t.parent_id === modal.topic.parent_id,
+        ).length;
+        await createTopic({
+          title,
+          summary: "",
+          parent_id: modal.topic.parent_id,
+          depth: modal.topic.depth,
+          sort_order: siblingCount,
+          status: "not_started",
+          tree_type: activeTree.slug as TreeType,
+          tree_id: activeTree.id,
+        });
+        closeModal();
+        await editor.refresh(true);
+        return;
+      }
+      if (modal.type === "concept") {
         const title = childTitle.trim();
         if (!title) return;
         if (!activeTree) return;
@@ -1339,13 +1380,14 @@ except ImportError:
             {/* Header */}
             <div className="tr-modal-header">
               <div className="tr-modal-icon">
-                {modal.type === "subject" && <FolderPlus size={15} />}
+                {(modal.type === "add-root" || modal.type === "subject") && <FolderPlus size={15} />}
                 {modal.type === "concept" && <Lightbulb size={15} />}
                 {(modal.type === "note" || modal.type === "edit-note") && <NotebookPen size={15} />}
                 {modal.type === "view-notes" && <BookOpen size={15} />}
               </div>
               <div className="tr-modal-title-block">
                 <strong>
+                  {modal.type === "add-root" && "Add Subject"}
                   {modal.type === "subject" && "Add Subject"}
                   {modal.type === "concept" && "Add Concept"}
                   {modal.type === "note" && "Add Explanation"}
@@ -1353,10 +1395,14 @@ except ImportError:
                   {modal.type === "view-notes" && "Explanations"}
                 </strong>
                 <p className="tr-modal-parent">
-                  {modal.type === "view-notes"
+                  {modal.type === "add-root"
+                    ? "new top-level subject"
+                    : modal.type === "view-notes"
                     ? `for "${modal.topic.title}"`
                     : modal.type === "edit-note"
                     ? `in "${modal.topic.title}"`
+                    : modal.type === "subject"
+                    ? `peer of "${modal.topic.title}"`
                     : `under "${modal.topic.title}"`}
                 </p>
               </div>
@@ -1372,16 +1418,16 @@ except ImportError:
 
             {/* Body */}
             <div className={`tr-modal-body${modal.type === "view-notes" ? " tr-modal-body--notes" : ""}`}>
-              {(modal.type === "subject" || modal.type === "concept") && (
+              {(modal.type === "add-root" || modal.type === "subject" || modal.type === "concept") && (
                 <label>
-                  {modal.type === "subject" ? "Subject title" : "Concept title"}
+                  {modal.type === "concept" ? "Concept title" : "Subject title"}
                   <input
                     value={childTitle}
                     onChange={(e) => setChildTitle(e.target.value)}
                     placeholder={
-                      modal.type === "subject"
-                        ? "e.g. Deep Learning"
-                        : "e.g. Backpropagation"
+                      modal.type === "concept"
+                        ? "e.g. Backpropagation"
+                        : "e.g. Deep Learning"
                     }
                     autoFocus
                     onKeyDown={(e) => e.key === "Enter" && void handleSaveModal()}
